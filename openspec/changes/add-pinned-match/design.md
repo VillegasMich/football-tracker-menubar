@@ -28,13 +28,12 @@ Add `@Published private(set) var pinnedMatchID: String?` plus `pin(_:)` / `unpin
 - **Why in the store:** the store is already the single `@MainActor` source of truth injected into views, and the cadence logic (which now depends on the pin) lives there too.
 - **Alternative considered:** a separate `PinStore`. Rejected — it would need to observe `matches` to resolve the pinned match and duplicate persistence wiring for one value.
 
-### Hoist store observation to the `App` scene so the label re-renders
+### Make the label observe the store so it re-renders
 
-This is the load-bearing change. The label closure must react to `store.objectWillChange`. Move ownership of the store to the `App` via `@StateObject`, and hand the same instance to the `AppDelegate` for lifecycle (`start()`/`stop()`), rather than the delegate creating it. The scene body then reads `store.pinnedMatch` to build the label.
+This is the load-bearing change. The label must react to `store.objectWillChange`. Keep the store **owned by the `AppDelegate`** (so it exists at `applicationDidFinishLaunching` and polling starts at launch), and render the label in a small `@ObservedObject` subview (`MenuBarLabel(store: appDelegate.store)`) that reads `store.pinnedMatch`. Inject the same instance into `MatchListView` via `.environmentObject`.
 
-- **Why:** `@NSApplicationDelegateAdaptor` does not make the delegate's `@Published` changes re-evaluate the scene body; the label would stay stale.
-- **Wiring:** `@StateObject private var store = MatchStore(provider: ESPNProvider())` in `App`; pass it to the delegate (e.g. via an initializer/`configure` call in `applicationDidFinishLaunching`, or expose it to the delegate through the adaptor). Inject the same instance into `MatchListView` with `.environmentObject(store)`.
-- **Alternative considered:** keep ownership in the delegate and add `@ObservedObject` in the scene referencing `appDelegate.store`. Workable but fragile — `@ObservedObject` on a value reached through the adaptor is easy to get wrong; single ownership in the scene is clearer.
+- **Why:** `@NSApplicationDelegateAdaptor` does not make the delegate's `@Published` changes re-evaluate the scene body; a static label would stay stale. An `@ObservedObject` subview does re-render.
+- **Why delegate ownership over `@StateObject` in the App (revised during apply):** the original plan owned the store as `@StateObject` in the `App` and handed it to the delegate. That creates an ordering hazard — `applicationDidFinishLaunching` (which calls `start()`) can fire before the scene hands the instance over, and `.onAppear` isn't valid on a `Scene`. Delegate ownership keeps the store alive at launch for `start()`/`stop()` while the `@ObservedObject` subview still gets live updates. Same spec behavior, no ordering fragility.
 
 ### Label content is a pure function of the pinned match
 

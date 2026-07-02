@@ -84,6 +84,11 @@ private struct Event: Decodable {
                 let id: String
                 let displayName: String
                 let abbreviation: String?
+                /// ESPN team crest URL, e.g.
+                /// `https://a.espncdn.com/i/teamlogos/soccer/500/359.png`.
+                /// Absent for some teams; `URL(string:)` also yields nil on a
+                /// malformed value, so a missing logo is non-fatal.
+                let logo: String?
             }
         }
     }
@@ -99,10 +104,12 @@ private struct Event: Decodable {
 
         let home = Team(id: homeC.team.id,
                         name: homeC.team.displayName,
-                        abbreviation: homeC.team.abbreviation ?? "")
+                        abbreviation: homeC.team.abbreviation ?? "",
+                        logoURL: homeC.team.logo.flatMap(URL.init(string:)))
         let away = Team(id: awayC.team.id,
                         name: awayC.team.displayName,
-                        abbreviation: awayC.team.abbreviation ?? "")
+                        abbreviation: awayC.team.abbreviation ?? "",
+                        logoURL: awayC.team.logo.flatMap(URL.init(string:)))
         let score = Score(home: Int(homeC.score ?? "") ?? 0,
                           away: Int(awayC.score ?? "") ?? 0)
 

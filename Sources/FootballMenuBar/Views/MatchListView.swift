@@ -127,15 +127,20 @@ struct MatchListView: View {
     }
 }
 
-/// A single match row: teams stacked, score on the right, status underneath.
+/// A single match row: a pin control, each team with its logo, the score on the
+/// right, and a status badge.
 private struct MatchRow: View {
+    @EnvironmentObject private var store: MatchStore
     let match: Match
 
+    private var isPinned: Bool { store.pinnedMatchID == match.id }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 8) {
+            pinButton
             VStack(alignment: .leading, spacing: 2) {
-                Text(match.home.name).lineLimit(1)
-                Text(match.away.name).lineLimit(1)
+                teamLine(match.home)
+                teamLine(match.away)
             }
             .font(.subheadline)
             Spacer()
@@ -152,6 +157,25 @@ private struct MatchRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
+    }
+
+    private func teamLine(_ team: Team) -> some View {
+        HStack(spacing: 6) {
+            TeamLogoView(team: team)
+            Text(team.name).lineLimit(1)
+        }
+    }
+
+    private var pinButton: some View {
+        Button {
+            store.togglePin(match)
+        } label: {
+            Image(systemName: isPinned ? "pin.fill" : "pin")
+                .foregroundStyle(isPinned ? Color.accentColor : .secondary)
+                .imageScale(.small)
+        }
+        .buttonStyle(.borderless)
+        .help(isPinned ? "Unpin from menu bar" : "Pin to menu bar")
     }
 
     private var statusBadge: some View {
