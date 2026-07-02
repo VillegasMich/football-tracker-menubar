@@ -21,7 +21,7 @@
 - [x] 4.1 Own `MatchStore` in `AppDelegate` (revised from `@StateObject` in the App to avoid a launch-ordering hazard); label observes it via an `@ObservedObject` subview
 - [x] 4.2 Make the `MenuBarExtra` label read `store.pinnedMatch`: render `Text(title)` when the helper returns a string, else `Image(systemName: "soccerball")`
 - [x] 4.3 Inject the same store instance into `MatchListView` with `.environmentObject(store)`
-- [ ] 4.4 Verify polling still starts on launch and stops on terminate with the popover closed
+- [x] 4.4 Verify polling still starts on launch and stops on terminate with the popover closed
 
 ## 5. Popover rows (logos + pin control)
 
