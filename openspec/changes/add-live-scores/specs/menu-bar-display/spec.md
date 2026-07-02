@@ -28,6 +28,23 @@ The system SHALL render a clear non-crashing state when there are no matches (e.
 - **WHEN** the latest fetch failed and no cached matches are available
 - **THEN** the popover shows an error state with a way to retry
 
+### Requirement: Relevant-match window
+
+The system SHALL only display matches relevant to the current day: any in-progress match, plus matches kicking off from the start of today through a configurable upcoming horizon (default: today only). Finished matches from previous days and fixtures beyond the horizon SHALL be excluded.
+
+#### Scenario: Today's matches shown
+- **WHEN** a match is live, or kicks off today
+- **THEN** it appears in the popover
+
+#### Scenario: Past finished matches hidden
+- **WHEN** a match finished on a previous day
+- **THEN** it does not appear in the popover
+
+#### Scenario: Far-future fixtures hidden
+- **WHEN** an upcoming match kicks off beyond the upcoming horizon (e.g. an out-of-season league's next fixture weeks away)
+- **THEN** it does not appear in the popover
+- **AND** its league section is omitted if it has no other matches to show
+
 ### Requirement: Menu bar controls
 
 The system SHALL keep the ⚽ menu bar label and provide, within the popover, controls to refresh now and to quit the app.
