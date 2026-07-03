@@ -18,4 +18,4 @@
 
 ## 4. Spec sync
 
-- [ ] 4.1 After implementation, sync the `score-refresh` delta into the main spec (via archive) so `openspec/specs/score-refresh/spec.md` reflects the new cadence requirement
+- [x] 4.1 After implementation, sync the `score-refresh` delta into the main spec (via archive) so `openspec/specs/score-refresh/spec.md` reflects the new cadence requirement
