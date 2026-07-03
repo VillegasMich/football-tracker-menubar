@@ -2,6 +2,11 @@
 
 A macOS menu bar app built with SwiftUI's `MenuBarExtra`.
 
+<img width="36" height="26" alt="Screenshot 2026-07-03 at 9 05 51 AM" src="https://github.com/user-attachments/assets/1e219ce8-c7f5-40b5-ad27-0ac91b126820" />
+<img width="213" height="155" alt="Screenshot 2026-07-03 at 9 06 09 AM" src="https://github.com/user-attachments/assets/c5bb3129-2889-4909-944f-b8def897d00c" />
+<img width="121" height="158" alt="Screenshot 2026-07-03 at 9 05 59 AM" src="https://github.com/user-attachments/assets/b456bfac-0786-4f96-bf4b-d2f3425ac942" />
+
+
 ## Requirements
 - macOS 13 or later
 - Swift 6 toolchain (no full Xcode required)
