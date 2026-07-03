@@ -195,18 +195,31 @@ final class MatchStore: ObservableObject {
     }
 
     /// Fast (LIVE) cadence applies while the pinned match is in-progress, while
-    /// a pinned match is about to kick off today, or while the browsed day has a
-    /// live match.
+    /// a pinned match is about to kick off today, while the browsed day has a
+    /// live match, or while today has a kickoff that is due but not yet live.
     var wantsLiveCadence: Bool {
-        (pinnedSnapshot?.isLive ?? false) || pinnedUpcomingKicksOffToday || hasLiveMatch
+        (pinnedSnapshot?.isLive ?? false) || pinnedUpcomingKicksOffToday
+            || hasLiveMatch || todayHasDueKickoff
+    }
+
+    /// True when the browsed day is today and holds an upcoming match whose
+    /// kickoff time has already passed but which the feed still reports as
+    /// upcoming — the "should be live now" window. This switches the loop to the
+    /// fast cadence around kickoff so the flip to live is caught within one fast
+    /// interval, then hands off to `hasLiveMatch` once the feed reports it live.
+    var todayHasDueKickoff: Bool {
+        isViewingToday && matches.contains { $0.state == .upcoming && $0.kickoff <= Date() }
     }
 
     /// One refresh tick: keep the pinned ticker live regardless of the browsed
-    /// day, and refresh the browse feed only while the browsed day is live. When
+    /// day, and refresh the browse feed while the browsed day is today or has a
+    /// live match. Refreshing today (not just a live day) is what lets a
+    /// scheduled match flip to live on its own — a day of purely upcoming
+    /// matches would otherwise never re-fetch and so never observe kickoff. When
     /// the browsed day is the pinned day, the browse fetch also updates the
     /// snapshot, so the separate ticker fetch is skipped.
     private func tick() async {
-        let browseWillRefresh = hasLiveMatch
+        let browseWillRefresh = isViewingToday || hasLiveMatch
         if !(browseWillRefresh && pinnedDayIsBrowsed) {
             await refreshTicker()
         }
