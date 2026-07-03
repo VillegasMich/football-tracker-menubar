@@ -47,7 +47,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `.accessory` keeps the app out of the Dock and the app switcher,
         // so it lives only in the menu bar.
         NSApp.setActivationPolicy(.accessory)
+
+        // Reset the browsed day to today every time the popover opens. SwiftUI's
+        // `.onAppear` fires only when the `.window`-style MenuBarExtra content is
+        // first created (the window is reused across opens), so it can't do this.
+        // The popover is this accessory app's only window, so its window becoming
+        // key is a reliable "just opened" signal. `goToToday()` no-ops when
+        // already on today, so repeat/spurious fires are harmless.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(popoverWindowBecameKey),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil)
+
         store.start()
+    }
+
+    @objc private func popoverWindowBecameKey() {
+        Task { await store.goToToday() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
