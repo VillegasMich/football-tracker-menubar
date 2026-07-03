@@ -29,7 +29,7 @@ private struct MenuBarLabel: View {
     @ObservedObject var store: MatchStore
 
     var body: some View {
-        if let title = MenuBarTitle.text(for: store.pinnedMatch) {
+        if let title = MenuBarTitle.text(for: store.pinnedSnapshot) {
             Text(title)
         } else {
             Image(systemName: "soccerball")

@@ -11,15 +11,32 @@ struct ESPNProvider: MatchDataProvider {
         self.session = session
     }
 
-    private func scoreboardURL(slug: String) -> URL {
-        URL(string: "https://site.api.espn.com/apis/site/v2/sports/soccer/\(slug)/scoreboard")!
+    /// Scoreboard URL for a league on a specific day. The `dates=` query is the
+    /// one place the day→endpoint mapping lives: it maps the day to the single
+    /// `YYYYMMDD` of its local calendar date, so the query matches the date the
+    /// user sees in the header. A future fix for late-night kickoffs that ESPN
+    /// files under an adjacent day (design D5) can widen this to a 2-day range
+    /// here without touching callers.
+    private func scoreboardURL(slug: String, day: Date) -> URL {
+        var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/soccer/\(slug)/scoreboard")!
+        components.queryItems = [URLQueryItem(name: "dates", value: Self.espnDay(day))]
+        return components.url!
     }
 
-    func matches(for leagues: [League]) async throws -> [Match] {
+    /// Formats a day as ESPN's `YYYYMMDD` using its local calendar date.
+    private static func espnDay(_ day: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyyMMdd"
+        return f.string(from: day)
+    }
+
+    func matches(for leagues: [League], on day: Date) async throws -> [Match] {
         // One scoreboard call per league, fetched concurrently and merged.
         try await withThrowingTaskGroup(of: [Match].self) { group in
             for league in leagues {
-                group.addTask { try await self.matches(for: league) }
+                group.addTask { try await self.matches(for: league, on: day) }
             }
             var all: [Match] = []
             for try await leagueMatches in group {
@@ -29,8 +46,8 @@ struct ESPNProvider: MatchDataProvider {
         }
     }
 
-    private func matches(for league: League) async throws -> [Match] {
-        let request = URLRequest(url: scoreboardURL(slug: league.slug))
+    private func matches(for league: League, on day: Date) async throws -> [Match] {
+        let request = URLRequest(url: scoreboardURL(slug: league.slug, day: day))
         let data: Data
         let response: URLResponse
         do {

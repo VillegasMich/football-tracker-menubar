@@ -18,25 +18,73 @@ struct MatchListView: View {
 
     // MARK: - Header
 
+    /// Day label shown in the stepper, e.g. `Thu, Jul 2`.
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEE MMM d")
+        return f
+    }()
+
     private var header: some View {
-        HStack {
-            Label("Football", systemImage: "soccerball")
-                .font(.headline)
-            Spacer()
-            if store.isRefreshing {
-                ProgressView().controlSize(.small)
-            }
+        HStack(spacing: 8) {
             Button {
-                Task { await store.refresh() }
+                Task { await store.stepDay(by: -1) }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: "chevron.left")
             }
             .buttonStyle(.borderless)
-            .help("Refresh now")
-            .disabled(store.isRefreshing)
+            .help("Previous day")
+            .disabled(store.isSteppingDate)
+
+            Spacer(minLength: 0)
+
+            VStack(spacing: 1) {
+                Text(Self.dayFormatter.string(from: store.selectedDate))
+                    .font(.headline)
+                todayControl
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                Task { await store.stepDay(by: 1) }
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .buttonStyle(.borderless)
+            .help("Next day")
+            .disabled(store.isSteppingDate)
+
+            if store.isRefreshing || store.isSteppingDate {
+                ProgressView().controlSize(.small)
+            } else {
+                Button {
+                    Task { await store.refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Refresh now")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    /// Shows "Today" when the selected day is today, otherwise a control to
+    /// jump back to today.
+    @ViewBuilder
+    private var todayControl: some View {
+        if store.isViewingToday {
+            Text("Today")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        } else {
+            Button("Today") { Task { await store.goToToday() } }
+                .buttonStyle(.borderless)
+                .font(.caption2)
+                .disabled(store.isSteppingDate)
+        }
     }
 
     // MARK: - Content
@@ -86,10 +134,27 @@ struct MatchListView: View {
         }
     }
 
+    /// Short day label for the empty state, e.g. `Jul 2`.
+    private static let emptyDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("MMM d")
+        return f
+    }()
+
     private var emptyState: some View {
-        stateMessage(icon: "calendar",
-                     title: "No matches right now",
-                     subtitle: "Nothing live or scheduled in your leagues today.")
+        VStack(spacing: 10) {
+            stateMessage(
+                icon: "calendar",
+                title: "No matches on \(Self.emptyDayFormatter.string(from: store.selectedDate))",
+                subtitle: store.isViewingToday
+                    ? "Nothing live or scheduled in your leagues today."
+                    : "Nothing scheduled in your leagues that day.")
+            if !store.isViewingToday {
+                Button("Back to today") { Task { await store.goToToday() } }
+                    .buttonStyle(.borderless)
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     private func errorState(_ message: String) -> some View {
