@@ -24,30 +24,36 @@ The system SHALL present the current matches in the menu bar popover, grouped by
 
 ### Requirement: Empty and error states
 
-The system SHALL render a clear non-crashing state when there are no matches (e.g. an off-season league returns an empty scoreboard) or when fetching failed.
+The system SHALL render a clear non-crashing state when the selected day has no matches (e.g. an off-day, or an off-season league returns an empty scoreboard) or when fetching failed. The empty state SHALL refer to the selected day rather than implying "today," and SHALL offer a way back to today when the selected day is not today.
 
-#### Scenario: No matches to show
-- **WHEN** the selected leagues return no matches
-- **THEN** the popover shows an explanatory empty state rather than a blank or broken view
+#### Scenario: No matches on the selected day
+- **WHEN** the selected leagues return no matches for the selected day
+- **THEN** the popover shows an explanatory empty state naming the selected day rather than a blank or broken view
+- **AND** when the selected day is not today, it offers a way to return to today
 
 #### Scenario: Fetch failed
-- **WHEN** the latest fetch failed and no cached matches are available
+- **WHEN** the latest fetch failed and no matches are available to show
 - **THEN** the popover shows an error state with a way to retry
 
 ### Requirement: Relevant-match window
 
-The system SHALL only display matches relevant to the current day: any in-progress match, plus matches kicking off from the start of today through a configurable upcoming horizon (default: today only). Finished matches from previous days and fixtures beyond the horizon SHALL be excluded.
+The system SHALL display the matches for the currently selected day (per the `date-navigation` capability), grouped by league. The selected day defaults to today. When the selected day is today, any in-progress match SHALL also be shown even if the data source reports it under an adjacent day. Matches that do not belong to the selected day SHALL be excluded.
 
-#### Scenario: Today's matches shown
-- **WHEN** a match is live, or kicks off today
+#### Scenario: Selected day's matches shown
+- **WHEN** a day is selected
+- **THEN** the popover shows the matches scheduled for that day
+
+#### Scenario: Past day shows its finished matches
+- **WHEN** the user selects a past day
+- **THEN** that day's finished matches are shown
+- **AND** they are not excluded merely for having finished
+
+#### Scenario: Live match always shown on today
+- **WHEN** the selected day is today and a match is in-progress
 - **THEN** it appears in the popover
 
-#### Scenario: Past finished matches hidden
-- **WHEN** a match finished on a previous day
-- **THEN** it does not appear in the popover
-
-#### Scenario: Far-future fixtures hidden
-- **WHEN** an upcoming match kicks off beyond the upcoming horizon (e.g. an out-of-season league's next fixture weeks away)
+#### Scenario: Other days' matches excluded
+- **WHEN** a match does not belong to the selected day and is not a live match on today
 - **THEN** it does not appear in the popover
 - **AND** its league section is omitted if it has no other matches to show
 
