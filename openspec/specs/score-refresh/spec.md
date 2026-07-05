@@ -27,7 +27,7 @@ The system SHALL provide an observable store that fetches matches through the `M
 
 ### Requirement: State-driven refresh cadence
 
-The system SHALL auto-refresh on an interval that depends on live play across both feeds. The store SHALL poll on a fast interval (LIVE mode, ~30–60s) when the pinned match is in-progress, when a pinned match is upcoming and kicks off today, when the currently browsed day has an in-progress match, or when the currently browsed day is today and has an upcoming match whose kickoff time has been reached but which the feed still reports as upcoming (the "kickoff due" window); otherwise it SHALL poll on a slow interval (IDLE mode, ~5–15 min). On each fast/slow tick the store SHALL refresh the ticker feed for the pinned match (keeping the menu bar title live regardless of the browsed day), and SHALL refresh the browse feed while the browsed day is today OR has a live match. When the browsed day equals the pinned match's day, a single fetch MAY serve both feeds. The mode SHALL be recomputed after each fetch.
+The system SHALL auto-refresh on an interval that depends on live play across both feeds. The store SHALL poll on a fast interval (LIVE mode) when the pinned match is in-progress, when a pinned match is upcoming and kicks off today, when the currently browsed day has an in-progress match, or when the currently browsed day is today and has an upcoming match whose kickoff time has been reached but which the feed still reports as upcoming (the "kickoff due" window); otherwise it SHALL poll on a slow interval (IDLE mode). The fast and slow interval durations SHALL be the currently configured live and idle intervals from the user's settings (per the `app-settings` capability), each bounded below by its floor, rather than fixed constants; when no cadence has been configured the durations SHALL equal the app's prior defaults. A change to the configured cadence SHALL take effect no later than the next tick, without a relaunch. On each fast/slow tick the store SHALL refresh the ticker feed for the pinned match (keeping the menu bar title live regardless of the browsed day), and SHALL refresh the browse feed while the browsed day is today OR has a live match. When the browsed day equals the pinned match's day, a single fetch MAY serve both feeds. The mode SHALL be recomputed after each fetch.
 
 #### Scenario: Fast polling while the pinned match is live
 - **WHEN** the pinned match is in-progress
@@ -61,6 +61,14 @@ The system SHALL auto-refresh on an interval that depends on live play across bo
 #### Scenario: Back off when nothing is live and no kickoff is due
 - **WHEN** the pinned match is neither in-progress nor upcoming-today, no browsed match is in-progress, and today has no upcoming match whose kickoff time has been reached
 - **THEN** the store refreshes on the slow (IDLE) interval
+
+#### Scenario: Configured cadence drives the interval durations
+- **WHEN** the user has selected a cadence preset
+- **THEN** the fast interval equals that preset's configured live interval and the slow interval equals its configured idle interval
+
+#### Scenario: Cadence change applies without relaunch
+- **WHEN** the user changes the cadence preset while the app is running
+- **THEN** the new interval durations take effect no later than the next tick
 
 ### Requirement: Manual refresh
 
