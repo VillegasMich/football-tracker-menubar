@@ -182,7 +182,10 @@ struct MatchListView: View {
 
     private var footer: some View {
         HStack {
+            settingsControl
+
             Spacer()
+
             Button("Quit") { NSApp.terminate(nil) }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
@@ -190,13 +193,45 @@ struct MatchListView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
     }
+
+    /// Opens the standard Settings window. This accessory (Dock-less) app has no
+    /// app menu, so the AppKit `showSettingsWindow:` action sent through the
+    /// responder chain finds no target and silently no-ops. `SettingsLink`
+    /// (macOS 14+) opens and activates the Settings scene reliably; on the
+    /// macOS 13 floor we fall back to the (best-effort) action send.
+    @ViewBuilder
+    private var settingsControl: some View {
+        if #available(macOS 14, *) {
+            SettingsLink {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Settings")
+        } else {
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Settings")
+        }
+    }
 }
 
 /// A single match row: a pin control, each team with its logo, the score on the
 /// right, and a status badge.
 private struct MatchRow: View {
     @EnvironmentObject private var store: MatchStore
+    @EnvironmentObject private var settings: AppSettings
     let match: Match
+
+    /// The team whose abbreviation is being edited, driving the entry alert.
+    @State private var editingTeam: Team?
+    @State private var draftAbbreviation = ""
 
     private var isPinned: Bool { store.pinnedMatchID == match.id }
 
@@ -222,12 +257,39 @@ private struct MatchRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
+        .alert("Team abbreviation", isPresented: editingAlertBinding) {
+            TextField("Abbreviation", text: $draftAbbreviation)
+            Button("Save") {
+                if let team = editingTeam { settings.setAbbreviation(draftAbbreviation, for: team) }
+                editingTeam = nil
+            }
+            Button("Cancel", role: .cancel) { editingTeam = nil }
+        } message: {
+            if let team = editingTeam {
+                Text("Shown for \(team.name) in the menu bar and where a logo isn't available. Leave blank to reset.")
+            }
+        }
+    }
+
+    /// Presents the entry alert while a team is being edited.
+    private var editingAlertBinding: Binding<Bool> {
+        Binding(get: { editingTeam != nil },
+                set: { if !$0 { editingTeam = nil } })
     }
 
     private func teamLine(_ team: Team) -> some View {
         HStack(spacing: 6) {
             TeamLogoView(team: team)
             Text(team.name).lineLimit(1)
+        }
+        .contextMenu {
+            Button("Set abbreviation…") {
+                draftAbbreviation = settings.effectiveAbbreviation(for: team)
+                editingTeam = team
+            }
+            if settings.hasOverride(for: team) {
+                Button("Reset to default") { settings.clearAbbreviation(for: team) }
+            }
         }
     }
 

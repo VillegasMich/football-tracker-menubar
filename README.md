@@ -51,13 +51,27 @@ open /Applications/FootballMenuBar.app
 To launch it automatically at login, add it under
 **System Settings → General → Login Items → Open at Login**.
 
+## Settings
+
+Open the **Settings** window from the gear icon in the popover footer (the app
+is a Dock-less accessory, so there's no Dock menu). It offers:
+
+- **Update frequency** — pick a refresh cadence preset (Battery Saver / Balanced
+  / Aggressive); each maps to a bounded live/idle poll interval.
+- **Menu bar live indicator** — show a red pill on the pinned match's menu bar
+  title while it's live, optionally including the match minute.
+
+**Team abbreviations** are edited contextually: right-click a team in the
+popover to set a custom abbreviation (used in the menu bar title and wherever a
+logo isn't available) or reset it to the ESPN default. All settings persist
+across relaunches.
+
 ## Project layout
 
 | File | Purpose |
 | --- | --- |
-| `Sources/FootballMenuBar/FootballMenuBarApp.swift` | App entry point + `AppDelegate` that hides the Dock icon |
-| `Sources/FootballMenuBar/MenuContent.swift` | The dropdown menu items — start editing here |
-
-## Next steps
-- Swap `.menuBarExtraStyle(.menu)` for `.window` to show a full SwiftUI popover.
-- Change the `systemImage: "soccerball"` to any [SF Symbol](https://developer.apple.com/sf-symbols/).
+| `Sources/FootballMenuBar/FootballMenuBarApp.swift` | App entry point, `AppDelegate` (hides the Dock icon), the menu bar label, and the `Settings` scene |
+| `Sources/FootballMenuBar/Views/MatchListView.swift` | The popover: match rows, footer controls, and the abbreviation context menu |
+| `Sources/FootballMenuBar/Views/SettingsView.swift` | The Settings window contents |
+| `Sources/FootballMenuBar/Settings/AppSettings.swift` | Persisted, observable user configuration |
+| `Sources/FootballMenuBar/Store/MatchStore.swift` | Match data store and the state-driven refresh loop |

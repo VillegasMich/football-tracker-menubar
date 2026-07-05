@@ -59,3 +59,15 @@ The settings SHALL expose two related toggles governing the pinned-match menu ba
 #### Scenario: Toggles drive the menu bar title
 - **WHEN** the user changes either toggle
 - **THEN** the pinned-match menu bar title reflects the new choice on the next render, per the `match-pinning` capability
+
+### Requirement: Team logos in the menu bar configuration
+
+The settings SHALL expose a "show team logos" toggle that controls whether the pinned-match menu bar title displays team crests/logos in place of the text abbreviations. It SHALL default to off (text abbreviations), preserving the prior menu bar appearance.
+
+#### Scenario: Logos toggle default
+- **WHEN** no value has been persisted for the team-logos setting
+- **THEN** it defaults to off and the menu bar title shows text abbreviations
+
+#### Scenario: Logos toggle drives the menu bar title
+- **WHEN** the user turns the team-logos setting on
+- **THEN** the pinned-match menu bar title shows the teams' logos on the next render, per the `match-pinning` capability

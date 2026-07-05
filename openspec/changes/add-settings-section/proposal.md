@@ -8,6 +8,7 @@ Today every user-facing behaviour is hardcoded: the refresh cadence lives as fix
 - **Configurable refresh cadence.** Replace the hardcoded live (~45s) and idle (~10min) intervals in `MatchStore` with user-selectable presets (e.g. Battery Saver / Balanced / Aggressive), each mapping to a bounded live/idle interval pair with sensible floors to protect the unofficial ESPN endpoint. The live-vs-idle *mode* logic is unchanged; only the durations become configurable.
 - **Per-team abbreviation overrides.** Let the user correct a team's abbreviation (keyed by ESPN's stable team id), persisted across launches and edited contextually by right-clicking a team in the dropdown. The effective (overridden) abbreviation is used everywhere abbreviations are shown — the menu bar title and the `TeamLogoView` flag/logo fallback.
 - **Configurable live status pill in the menu bar.** When the pinned match is in-progress, mirror the dropdown's red status pill into the menu bar title, gated by two nested settings: "show live indicator" and, under it, "include match minute (clock)". Scope is the pinned match only (the menu bar is inherently pinned-only); the dropdown's per-row pill behaviour is unchanged.
+- **Optional team logos in the menu bar.** A "show team logos" setting swaps the pinned match's text abbreviations in the menu bar title for the team crests/flags (as shown in the dropdown rows), falling back to the abbreviation for a team whose logo is unavailable.
 
 ## Capabilities
 

@@ -72,6 +72,18 @@ Editing is contextual: a `.contextMenu` on the team line in `MatchRow` with a "S
 
 Add a `Settings { SettingsView() }` scene to the `App` body. Under `.accessory` there is no menu bar app menu, so ⌘, isn't automatically routed; provide an explicit "Settings…" control (e.g. in the popover footer next to Quit) that activates the app and opens settings. Opening likely needs `NSApp.activate(ignoringOtherApps:)` plus the appropriate open-settings action for the deployment target (the `showSettingsWindow:`/`showPreferencesWindow:` selector differs by macOS version — resolve at implementation time against the macOS 13 floor). After the window closes, the app stays `.accessory`.
 
+### D6 — Team logos in the menu bar require single-image compositing (added during implementation)
+
+The optional "show team logos" mode surfaced two menu-bar rendering constraints that shaped the implementation:
+- A `MenuBarExtra` label renders only **one** image reliably; two sibling crest views left the second (away) blank regardless of load order. Fix: draw the whole logo-mode title — both crests, the score/time, and the live pill — into a **single `NSImage`** (`MenuBarLabel.composite`). Non-template so crests keep their colors; the score text color tracks `colorScheme`, so the label re-renders on light/dark change.
+- The label ignores SwiftUI `.frame` on images (they render at native pixel size, blowing up the status item), so crests are **pre-sized by drawing into a smaller `NSImage`** before compositing.
+
+Also fixed `LogoCache` here: it returned `nil` to any second concurrent caller for a URL already in flight, which left the menu bar crest blank while the still-alive popover held the same URL loading. It now coalesces concurrent requests by awaiting a shared download task, benefiting the popover too.
+
+Text mode (logos off) keeps the plain SwiftUI `Text` + pill, which renders and adapts correctly.
+
+**Settings opening:** `SettingsLink` (macOS 14+) proved necessary — the AppKit `showSettingsWindow:` action sent through the responder chain silently no-ops from a Dock-less accessory app. The macOS 13 fallback keeps the action-send path.
+
 ## Risks / Trade-offs
 
 - **[Colored pill may not render in the menu bar]** → D3 defines a 3-tier fallback; a 15-minute spike at the start of implementation picks the tier before the title view is finalized. Worst case (tier 3 emoji) still satisfies the spec's "live indicator, optionally with minute".

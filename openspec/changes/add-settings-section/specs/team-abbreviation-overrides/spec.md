@@ -33,6 +33,15 @@ The system SHALL let the user edit a team's abbreviation override contextually f
 - **WHEN** the user opens the context menu on a team that has an override and chooses to reset it
 - **THEN** the override is cleared and the team reverts to its ESPN abbreviation
 
+#### Scenario: Edit the pinned match's abbreviations from settings
+- **WHEN** a match is pinned and the user opens the settings window
+- **THEN** the settings offer an editable abbreviation field for each of the pinned match's two teams, each showing the current override (or the ESPN default as a placeholder) and a reset control
+- **AND** editing a field updates that team's override, and clearing it resets to the ESPN default
+
+#### Scenario: No pinned match to edit in settings
+- **WHEN** no match is pinned and the user opens the settings window
+- **THEN** the settings indicate that a match must be pinned to customize its menu bar abbreviations
+
 ### Requirement: Effective abbreviation applied wherever displayed
 
 The system SHALL resolve a team's displayed abbreviation through the override map — using the override when one exists for that team's id, and the ESPN-provided abbreviation otherwise — everywhere an abbreviation is shown, including the pinned-match menu bar title and the `TeamLogoView` logo/flag fallback in popover rows. A change to a team's override SHALL be reflected the next time that team's abbreviation is rendered, without an app relaunch.

@@ -16,17 +16,27 @@ enum MenuBarTitle {
     /// Title for the pinned match, or `nil` when there is nothing to show.
     /// - live / finished: `"ARS 1 – 0 CHE"` (abbreviations + score)
     /// - upcoming: `"ARS 7:00 PM CHE"` (abbreviations + kickoff time)
-    static func text(for match: Match?) -> String? {
+    ///
+    /// `abbreviation` resolves each team's displayed abbreviation, so callers can
+    /// route it through the per-team overrides. Defaults to the team's own
+    /// abbreviation, keeping this function pure and independently testable.
+    static func text(for match: Match?,
+                     abbreviation: (Team) -> String = { $0.abbreviation }) -> String? {
         guard let match else { return nil }
-        let home = match.home.abbreviation.uppercased()
-        let away = match.away.abbreviation.uppercased()
-        let middle: String
+        let home = abbreviation(match.home).uppercased()
+        let away = abbreviation(match.away).uppercased()
+        return "\(home) \(middle(for: match)) \(away)"
+    }
+
+    /// The state-dependent middle segment shared by the text title and the
+    /// logo-mode title: the score while in-progress/finished, the kickoff time
+    /// while upcoming.
+    static func middle(for match: Match) -> String {
         switch match.state {
         case .upcoming:
-            middle = kickoffFormatter.string(from: match.kickoff)
+            return kickoffFormatter.string(from: match.kickoff)
         case .inProgress, .finished:
-            middle = match.score.display
+            return match.score.display
         }
-        return "\(home) \(middle) \(away)"
     }
 }

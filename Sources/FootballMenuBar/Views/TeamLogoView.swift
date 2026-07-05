@@ -8,22 +8,32 @@ final class LogoCache: ObservableObject {
     static let shared = LogoCache()
 
     private var images: [URL: NSImage] = [:]
-    /// URLs currently being fetched, to avoid duplicate concurrent requests.
-    private var inFlight: Set<URL> = []
+    /// In-flight downloads keyed by URL. Concurrent callers for the same URL
+    /// await the same task rather than starting a duplicate — or, as before,
+    /// being turned away with `nil` (which left a second view, e.g. the menu bar
+    /// crest racing the still-alive popover, permanently blank). The task yields
+    /// `Data` (which is `Sendable` on the macOS 13 floor); the `NSImage` is built
+    /// here on the main actor.
+    private var tasks: [URL: Task<Data?, Never>] = [:]
 
     func cached(_ url: URL) -> NSImage? { images[url] }
 
-    /// Fetch and cache the logo at `url` if not already present. Failures are
-    /// swallowed — the view falls back to the abbreviation.
+    /// Fetch and cache the logo at `url` if not already present, coalescing
+    /// concurrent requests for the same URL. Failures are swallowed — the view
+    /// falls back to the abbreviation.
     func load(_ url: URL) async -> NSImage? {
         if let image = images[url] { return image }
-        guard !inFlight.contains(url) else { return nil }
-        inFlight.insert(url)
-        defer { inFlight.remove(url) }
-        guard
-            let (data, _) = try? await URLSession.shared.data(from: url),
-            let image = NSImage(data: data)
-        else { return nil }
+
+        let task: Task<Data?, Never>
+        if let existing = tasks[url] {
+            task = existing
+        } else {
+            task = Task { try? await URLSession.shared.data(from: url).0 }
+            tasks[url] = task
+        }
+        let data = await task.value
+        tasks[url] = nil
+        guard let data, let image = NSImage(data: data) else { return nil }
         images[url] = image
         return image
     }
@@ -35,6 +45,7 @@ struct TeamLogoView: View {
     let team: Team
     var size: CGFloat = 18
 
+    @EnvironmentObject private var settings: AppSettings
     @StateObject private var cache = LogoCache.shared
     @State private var image: NSImage?
 
@@ -53,7 +64,7 @@ struct TeamLogoView: View {
     }
 
     private var fallback: some View {
-        Text(team.abbreviation.uppercased())
+        Text(settings.effectiveAbbreviation(for: team).uppercased())
             .font(.system(size: 9, weight: .semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.6)

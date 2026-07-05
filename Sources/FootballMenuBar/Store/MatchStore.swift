@@ -14,11 +14,6 @@ import Combine
 /// macOS 13 deployment floor (the macro requires macOS 14).
 @MainActor
 final class MatchStore: ObservableObject {
-    /// Fast poll while something relevant is in-progress.
-    static let liveInterval: UInt64 = 45_000_000_000       // 45s
-    /// Lazy poll when nothing is live.
-    static let idleInterval: UInt64 = 600_000_000_000      // 10 min
-
     /// `UserDefaults` keys under which the pin is persisted.
     private static let pinnedMatchIDKey = "pinnedMatchID"
     private static let pinnedMatchDayKey = "pinnedMatchDay"
@@ -57,14 +52,18 @@ final class MatchStore: ObservableObject {
     let leagues: [League]
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
+    /// User configuration; the poll loop reads the cadence from it each tick.
+    let settings: AppSettings
     private var pollingTask: Task<Void, Never>?
 
     init(provider: MatchDataProvider,
          leagues: [League] = League.supported,
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         settings: AppSettings = AppSettings()) {
         self.provider = provider
         self.leagues = leagues
         self.defaults = defaults
+        self.settings = settings
         self.pinnedMatchID = defaults.string(forKey: Self.pinnedMatchIDKey)
         if let dayString = defaults.string(forKey: Self.pinnedMatchDayKey) {
             self.pinnedMatchDay = Self.dayKeyFormatter.date(from: dayString)
@@ -186,7 +185,10 @@ final class MatchStore: ObservableObject {
             guard let self else { return }
             await self.loadInitial()
             while !Task.isCancelled {
-                let interval = self.wantsLiveCadence ? Self.liveInterval : Self.idleInterval
+                // Read the configured cadence each iteration so a settings change
+                // takes effect no later than the next tick.
+                let cadence = self.settings.cadence
+                let interval = self.wantsLiveCadence ? cadence.liveInterval : cadence.idleInterval
                 try? await Task.sleep(nanoseconds: interval)
                 if Task.isCancelled { break }
                 await self.tick()
