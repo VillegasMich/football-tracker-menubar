@@ -182,7 +182,7 @@ struct MatchListView: View {
 
     private var footer: some View {
         HStack {
-            settingsControl
+            SettingsButton()
 
             Spacer()
 
@@ -193,31 +193,32 @@ struct MatchListView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
     }
+}
 
-    /// Opens the standard Settings window. This accessory (Dock-less) app has no
-    /// app menu, so the AppKit `showSettingsWindow:` action sent through the
-    /// responder chain finds no target and silently no-ops. `SettingsLink`
-    /// (macOS 14+) opens and activates the Settings scene reliably; on the
-    /// macOS 13 floor we fall back to the (best-effort) action send.
-    @ViewBuilder
-    private var settingsControl: some View {
-        if #available(macOS 14, *) {
-            SettingsLink {
-                Image(systemName: "gearshape")
+/// The footer gear that opens the settings window (managed by
+/// `SettingsWindowManager`, which floats it above other apps). While the window
+/// is open the icon fills in and tints with the accent color; each open/close
+/// spins it a half turn as a small "roll" flourish.
+private struct SettingsButton: View {
+    @EnvironmentObject private var settingsWindow: SettingsWindowManager
+    /// Accumulated rotation, nudged on every open/close so the gear rolls each
+    /// way rather than snapping.
+    @State private var roll = 0.0
+
+    var body: some View {
+        Button {
+            settingsWindow.toggle()
+        } label: {
+            Image(systemName: settingsWindow.isOpen ? "gearshape.fill" : "gearshape")
+                .rotationEffect(.degrees(roll))
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(settingsWindow.isOpen ? Color.accentColor : .secondary)
+        .help("Settings")
+        .onChange(of: settingsWindow.isOpen) { isOpen in
+            withAnimation(.easeInOut(duration: 0.35)) {
+                roll += isOpen ? 180 : -180
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("Settings")
-        } else {
-            Button {
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("Settings")
         }
     }
 }

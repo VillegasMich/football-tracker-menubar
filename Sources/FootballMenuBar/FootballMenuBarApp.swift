@@ -12,6 +12,7 @@ struct FootballMenuBarApp: App {
             MatchListView()
                 .environmentObject(appDelegate.store)
                 .environmentObject(appDelegate.settings)
+                .environmentObject(appDelegate.settingsWindow)
         } label: {
             // Rendered in its own view so it can observe the store and settings
             // and update the menu bar title as matches refresh.
@@ -21,13 +22,10 @@ struct FootballMenuBarApp: App {
         // instead of a flat native dropdown.
         .menuBarExtraStyle(.window)
 
-        // Global configuration lives in the standard Settings scene, opened from
-        // the popover footer (this accessory app has no app menu / Dock icon).
-        Settings {
-            SettingsView()
-                .environmentObject(appDelegate.settings)
-                .environmentObject(appDelegate.store)
-        }
+        // Global configuration lives in a window we manage ourselves (see
+        // `SettingsWindowManager`), opened from the popover footer, rather than
+        // the stock `Settings` scene — that one opens behind other apps for an
+        // accessory app and gives us no "is it open?" signal for the gear icon.
     }
 }
 
@@ -226,6 +224,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Single source of truth for match data, live for the app's lifetime so
     /// polling continues even while the popover is closed.
     lazy var store = MatchStore(provider: ESPNProvider(), settings: settings)
+
+    /// Owns the settings window (front-most while open) and publishes whether
+    /// it's open so the popover's gear icon can reflect it.
+    lazy var settingsWindow = SettingsWindowManager(settings: settings, store: store)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // `.accessory` keeps the app out of the Dock and the app switcher,
