@@ -306,8 +306,24 @@ private struct MatchRow: View {
         .help(isPinned ? "Unpin from menu bar" : "Pin to menu bar")
     }
 
+    /// Local kickoff time for scheduled matches, e.g. `7:00 PM`.
+    private static let kickoffTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("j mm")
+        return f
+    }()
+
+    /// For upcoming matches ESPN's `shortDetail` is unreliable (often just a
+    /// date), so show the kickoff time derived from `match.kickoff` instead.
+    private var badgeText: String {
+        if match.state == .upcoming, match.kickoff != .distantFuture {
+            return Self.kickoffTimeFormatter.string(from: match.kickoff)
+        }
+        return match.statusDetail
+    }
+
     private var statusBadge: some View {
-        Text(match.statusDetail)
+        Text(badgeText)
             .font(.caption2)
             .foregroundStyle(match.isLive ? .white : .secondary)
             .padding(.horizontal, 6)
