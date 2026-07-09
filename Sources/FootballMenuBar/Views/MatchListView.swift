@@ -255,6 +255,9 @@ private struct MatchRow: View {
             }
             .font(.subheadline.monospacedDigit())
             statusBadge
+            if match.state == .finished {
+                highlightsButton
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
@@ -304,6 +307,21 @@ private struct MatchRow: View {
         }
         .buttonStyle(.borderless)
         .help(isPinned ? "Unpin from menu bar" : "Pin to menu bar")
+    }
+
+    /// Opens the fixture's YouTube highlights search in the default browser.
+    /// Only rendered for finished matches (see body); upcoming and in-progress
+    /// rows never show it.
+    private var highlightsButton: some View {
+        Button {
+            NSWorkspace.shared.open(match.highlightsSearchURL)
+        } label: {
+            Image(systemName: "play.rectangle")
+                .foregroundStyle(.secondary)
+                .imageScale(.small)
+        }
+        .buttonStyle(.borderless)
+        .help("Watch highlights")
     }
 
     /// Local kickoff time for scheduled matches, e.g. `7:00 PM`.
