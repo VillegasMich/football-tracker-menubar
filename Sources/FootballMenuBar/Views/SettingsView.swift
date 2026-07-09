@@ -30,6 +30,20 @@ struct SettingsView: View {
                     .padding(.leading, 16)
             }
 
+            Section("Notifications") {
+                Toggle("Enable notifications", isOn: $settings.notificationsEnabled)
+                Toggle("Kickoff", isOn: $settings.notifyOnKickoff)
+                    // Subordinate to the master toggle — no effect while off.
+                    .disabled(!settings.notificationsEnabled)
+                    .padding(.leading, 16)
+                Toggle("Goals", isOn: $settings.notifyOnGoal)
+                    .disabled(!settings.notificationsEnabled)
+                    .padding(.leading, 16)
+                Text("Notifies for the pinned match only, when it kicks off and when goals are scored.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Pinned match abbreviations") {
                 if let match = store.pinnedSnapshot {
                     AbbreviationField(team: match.home)

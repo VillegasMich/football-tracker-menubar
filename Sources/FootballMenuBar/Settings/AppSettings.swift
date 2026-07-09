@@ -17,6 +17,9 @@ final class AppSettings: ObservableObject {
         static let includeMatchMinute = "settings.includeMatchMinute"
         static let showTeamLogos = "settings.showTeamLogos"
         static let abbreviationOverrides = "settings.abbreviationOverrides"
+        static let notificationsEnabled = "settings.notificationsEnabled"
+        static let notifyOnKickoff = "settings.notifyOnKickoff"
+        static let notifyOnGoal = "settings.notifyOnGoal"
     }
 
     /// Selected refresh cadence preset. Persisted by raw string; an unknown
@@ -49,6 +52,33 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(abbreviationOverrides, forKey: Key.abbreviationOverrides) }
     }
 
+    /// Master switch for pinned-match notifications. When off, no kickoff or
+    /// goal notification is posted, regardless of the subordinate toggles.
+    @Published var notificationsEnabled: Bool {
+        didSet {
+            defaults.set(notificationsEnabled, forKey: Key.notificationsEnabled)
+            // Fire only on an off→on transition so an owner (the notifier) can
+            // request authorization the moment notifications are switched on.
+            if notificationsEnabled && !oldValue { onNotificationsTurnedOn?() }
+        }
+    }
+
+    /// Whether the pinned match's kickoff posts a notification. Subordinate to
+    /// `notificationsEnabled` — no effect while it is off.
+    @Published var notifyOnKickoff: Bool {
+        didSet { defaults.set(notifyOnKickoff, forKey: Key.notifyOnKickoff) }
+    }
+
+    /// Whether the pinned match's goals post a notification. Subordinate to
+    /// `notificationsEnabled` — no effect while it is off.
+    @Published var notifyOnGoal: Bool {
+        didSet { defaults.set(notifyOnGoal, forKey: Key.notifyOnGoal) }
+    }
+
+    /// Invoked when `notificationsEnabled` transitions off→on, so the notifier
+    /// can request notification authorization at that moment. Set by app wiring.
+    var onNotificationsTurnedOn: (() -> Void)?
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -62,6 +92,10 @@ final class AppSettings: ObservableObject {
         self.includeMatchMinute = (defaults.object(forKey: Key.includeMatchMinute) as? Bool) ?? true
         // Logos default to off — text is the historical menu bar look.
         self.showTeamLogos = (defaults.object(forKey: Key.showTeamLogos) as? Bool) ?? false
+        // Notification toggles default to on when no value is persisted.
+        self.notificationsEnabled = (defaults.object(forKey: Key.notificationsEnabled) as? Bool) ?? true
+        self.notifyOnKickoff = (defaults.object(forKey: Key.notifyOnKickoff) as? Bool) ?? true
+        self.notifyOnGoal = (defaults.object(forKey: Key.notifyOnGoal) as? Bool) ?? true
         // Overrides: keep only well-formed String:String pairs; anything else
         // is ignored rather than crashing.
         let raw = defaults.dictionary(forKey: Key.abbreviationOverrides) ?? [:]

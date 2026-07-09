@@ -221,9 +221,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// store (for cadence) and the views (for the live pill and overrides).
     let settings = AppSettings()
 
+    /// Posts pinned-match kickoff/goal notifications. Requests authorization on
+    /// creation if notifications are enabled; shared with the store, which drives
+    /// it as the pinned snapshot updates.
+    lazy var notifier = MatchNotifier(settings: settings)
+
     /// Single source of truth for match data, live for the app's lifetime so
     /// polling continues even while the popover is closed.
-    lazy var store = MatchStore(provider: ESPNProvider(), settings: settings)
+    lazy var store = MatchStore(provider: ESPNProvider(), settings: settings, notifier: notifier)
 
     /// Owns the settings window (front-most while open) and publishes whether
     /// it's open so the popover's gear icon can reflect it.

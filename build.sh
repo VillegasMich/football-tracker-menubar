@@ -55,5 +55,12 @@ cat > "${BUNDLE}/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Re-sign ad-hoc with an explicit identifier so the bundle id is bound into the
+# signature. Without this, UNUserNotificationCenter.current() can't resolve the
+# running app's bundle and crashes ("bundleProxyForCurrentProcess is nil"), so
+# notifications never deliver.
+echo "==> Signing ${BUNDLE}"
+codesign --force --sign - --identifier "${BUNDLE_ID}" "${BUNDLE}"
+
 echo "==> Done: ${BUNDLE}"
 echo "Run it with:  open ${BUNDLE}"

@@ -54,16 +54,25 @@ final class MatchStore: ObservableObject {
     private let defaults: UserDefaults
     /// User configuration; the poll loop reads the cadence from it each tick.
     let settings: AppSettings
+    /// Posts pinned-match notifications. Optional so tests/previews can omit it.
+    private let notifier: MatchNotifier?
     private var pollingTask: Task<Void, Never>?
+
+    /// Distinguishes a snapshot write that reflects live observation (a poll
+    /// tick, which may notify) from one that merely seeds the pinned match (pin,
+    /// launch restore, unpin — never notifies).
+    private enum SnapshotSource { case seed, poll }
 
     init(provider: MatchDataProvider,
          leagues: [League] = League.supported,
          defaults: UserDefaults = .standard,
-         settings: AppSettings = AppSettings()) {
+         settings: AppSettings = AppSettings(),
+         notifier: MatchNotifier? = nil) {
         self.provider = provider
         self.leagues = leagues
         self.defaults = defaults
         self.settings = settings
+        self.notifier = notifier
         self.pinnedMatchID = defaults.string(forKey: Self.pinnedMatchIDKey)
         if let dayString = defaults.string(forKey: Self.pinnedMatchDayKey) {
             self.pinnedMatchDay = Self.dayKeyFormatter.date(from: dayString)
@@ -84,7 +93,7 @@ final class MatchStore: ObservableObject {
     func pin(_ match: Match) {
         pinnedMatchID = match.id
         pinnedMatchDay = Calendar.current.startOfDay(for: match.kickoff)
-        pinnedSnapshot = match
+        setPinnedSnapshot(match, source: .seed)
         persistPin()
     }
 
@@ -92,7 +101,7 @@ final class MatchStore: ObservableObject {
     func unpin() {
         pinnedMatchID = nil
         pinnedMatchDay = nil
-        pinnedSnapshot = nil
+        setPinnedSnapshot(nil, source: .seed)
         persistPin()
     }
 
@@ -223,7 +232,7 @@ final class MatchStore: ObservableObject {
     private func tick() async {
         let browseWillRefresh = isViewingToday || hasLiveMatch
         if !(browseWillRefresh && pinnedDayIsBrowsed) {
-            await refreshTicker()
+            await refreshTicker(source: .poll)
         }
         if browseWillRefresh {
             await refresh()
@@ -270,19 +279,21 @@ final class MatchStore: ObservableObject {
     // MARK: - Ticker feed
 
     /// Restore the pinned ticker on launch by fetching the pinned match's day.
+    /// This is a seed, not live observation, so it must never notify.
     private func restorePinnedSnapshot() async {
         guard pinnedMatchID != nil else { return }
-        await refreshTicker()
+        await refreshTicker(source: .seed)
     }
 
     /// Fetch the pinned match's day and update its snapshot. A successful fetch
     /// that no longer contains the pinned id clears the snapshot (⇒ ⚽); a
-    /// transient failure keeps the last snapshot.
-    private func refreshTicker() async {
-        guard let id = pinnedMatchID else { pinnedSnapshot = nil; return }
+    /// transient failure keeps the last snapshot. `source` distinguishes the
+    /// launch seed from a live poll tick for notification purposes.
+    private func refreshTicker(source: SnapshotSource) async {
+        guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
         do {
             let fetched = try await provider.matches(for: leagues, on: pinnedDay)
-            pinnedSnapshot = fetched.first { $0.id == id }
+            setPinnedSnapshot(fetched.first { $0.id == id }, source: source)
         } catch {
             // Keep the last-known snapshot on a transient failure.
         }
@@ -290,10 +301,22 @@ final class MatchStore: ObservableObject {
 
     /// When browsing the pinned match's own day, treat the browse fetch as
     /// authoritative for the snapshot (including clearing it if the match is
-    /// absent). When browsing another day, leave the snapshot untouched.
+    /// absent). When browsing another day, leave the snapshot untouched. Browse
+    /// refreshes are live observation, so they go through as a poll.
     private func updateSnapshotFromBrowse(_ fetched: [Match]) {
         guard let id = pinnedMatchID, pinnedDayIsBrowsed else { return }
-        pinnedSnapshot = fetched.first { $0.id == id }
+        setPinnedSnapshot(fetched.first { $0.id == id }, source: .poll)
+    }
+
+    /// The single choke point for writing `pinnedSnapshot`. Drives the notifier:
+    /// a `.seed` write updates its baseline silently; a `.poll` write is
+    /// evaluated for kickoff/goal notifications.
+    private func setPinnedSnapshot(_ new: Match?, source: SnapshotSource) {
+        pinnedSnapshot = new
+        switch source {
+        case .seed: notifier?.seed(new)
+        case .poll: notifier?.evaluate(new)
+        }
     }
 
     // MARK: - Helpers
