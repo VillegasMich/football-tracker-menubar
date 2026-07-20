@@ -25,6 +25,7 @@ mkdir -p "${BUNDLE}/Contents/Resources"
 
 cp "${BIN_PATH}" "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 chmod +x "${BUNDLE}/Contents/MacOS/${APP_NAME}"
+cp "Resources/AppIcon.icns" "${BUNDLE}/Contents/Resources/AppIcon.icns"
 
 cat > "${BUNDLE}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -37,6 +38,8 @@ cat > "${BUNDLE}/Contents/Info.plist" <<PLIST
     <string>Football Menu Bar</string>
     <key>CFBundleExecutable</key>
     <string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundlePackageType</key>
