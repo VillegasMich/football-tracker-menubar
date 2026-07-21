@@ -39,6 +39,39 @@ surfaces scores, kickoff times, and live match minutes at a glance.
 
 ## Getting Started
 
+### Install with Homebrew
+
+The easiest way to install Football Menu Bar is through my Homebrew tap:
+
+```sh
+brew tap VillegasMich/tap
+brew install --cask football-menubar
+```
+
+This drops `FootballMenuBar.app` into `/Applications`. Launch it from Spotlight
+or with `open -a FootballMenuBar`.
+
+> **First launch:** the app isn't notarized yet, so macOS Gatekeeper will block
+> it the first time. Right-click the app in `/Applications`, choose **Open**,
+> then confirm — or run:
+>
+> ```sh
+> xattr -dr com.apple.quarantine "/Applications/FootballMenuBar.app"
+> ```
+
+Update to the latest release at any time with:
+
+```sh
+brew upgrade --cask football-menubar
+```
+
+Uninstall (optionally removing saved settings) with:
+
+```sh
+brew uninstall --cask football-menubar
+brew uninstall --zap --cask football-menubar   # also removes preferences
+```
+
 ### Run in development
 
 ```sh
