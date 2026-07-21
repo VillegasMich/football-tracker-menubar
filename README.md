@@ -51,14 +51,6 @@ brew install --cask football-menubar
 This drops `FootballMenuBar.app` into `/Applications`. Launch it from Spotlight
 or with `open -a FootballMenuBar`.
 
-> **First launch:** the app isn't notarized yet, so macOS Gatekeeper will block
-> it the first time. Right-click the app in `/Applications`, choose **Open**,
-> then confirm — or run:
->
-> ```sh
-> xattr -dr com.apple.quarantine "/Applications/FootballMenuBar.app"
-> ```
-
 Update to the latest release at any time with:
 
 ```sh
