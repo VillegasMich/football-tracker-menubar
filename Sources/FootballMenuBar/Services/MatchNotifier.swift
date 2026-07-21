@@ -46,7 +46,15 @@ final class MatchNotifier {
     func requestAuthorizationIfNeeded() {
         guard settings.notificationsEnabled, !didRequestAuthorization else { return }
         didRequestAuthorization = true
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // Use the async API rather than the completion-handler form. Because this
+        // type is `@MainActor`, a trailing closure would inherit main-actor
+        // isolation, but `requestAuthorization`'s completion handler is invoked on
+        // a background queue — tripping a libdispatch main-thread assertion
+        // (SIGTRAP) the moment authorization resolves. `await` hops actors safely.
+        let center = self.center
+        Task {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        }
     }
 
     // MARK: - Baseline updates
