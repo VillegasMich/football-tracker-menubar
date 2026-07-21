@@ -8,6 +8,10 @@ cd "$(dirname "$0")"
 APP_NAME="FootballMenuBar"
 BUNDLE="${APP_NAME}.app"
 BUNDLE_ID="com.local.footballmenubar"
+# Must match the git tag / GitHub Release (tag "v1.0.0" => VERSION "1.0.0")
+# and the `version` field in the Homebrew cask. Overridable via env so CI can
+# derive it from the pushed tag, e.g. `VERSION=1.2.3 ./build.sh`.
+VERSION="${VERSION:-1.0.0}"
 
 echo "==> Building release binary"
 swift build -c release
@@ -65,5 +69,15 @@ PLIST
 echo "==> Signing ${BUNDLE}"
 codesign --force --sign - --identifier "${BUNDLE_ID}" "${BUNDLE}"
 
-echo "==> Done: ${BUNDLE}"
-echo "Run it with:  open ${BUNDLE}"
+# Zip the .app bundle for distribution via the Homebrew cask / GitHub Release.
+# `ditto -c -k --keepParent` is the macOS-correct way to zip an .app: it
+# preserves the bundle structure, symlinks, and resource forks.
+ZIP="${APP_NAME}-${VERSION}.zip"
+echo "==> Zipping ${ZIP}"
+rm -f "${ZIP}"
+ditto -c -k --keepParent "${BUNDLE}" "${ZIP}"
+
+echo "==> Done: ${BUNDLE} and ${ZIP}"
+echo "Run it with:      open ${BUNDLE}"
+echo "sha256 (for cask):"
+shasum -a 256 "${ZIP}"

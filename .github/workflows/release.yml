@@ -1,0 +1,52 @@
+name: Release
+
+# Fires when you push a version tag, e.g.:
+#   git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # needed to create/update the GitHub Release and upload assets
+
+jobs:
+  build-and-release:
+    # macOS runner is required to build a SwiftUI .app bundle and codesign it.
+    # macos-15 ships Xcode 16 / Swift 6 (matches swift-tools-version:6.0).
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        # Strip the leading "v": refs/tags/v1.2.3 -> 1.2.3
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build .app and zip it
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./build.sh
+
+      - name: Compute sha256 (shown in the job summary for the cask)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ZIP="FootballMenuBar-${VERSION}.zip"
+          SHA=$(shasum -a 256 "$ZIP" | awk '{print $1}')
+          {
+            echo "### Homebrew cask values for \`v${VERSION}\`"
+            echo ""
+            echo "\`\`\`ruby"
+            echo "version \"${VERSION}\""
+            echo "sha256 \"${SHA}\""
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create release and upload the app zip
+        uses: softprops/action-gh-release@v2
+        with:
+          # Attaches the built bundle to the release for this tag, creating the
+          # release if it doesn't exist yet.
+          files: FootballMenuBar-${{ steps.version.outputs.version }}.zip
