@@ -230,14 +230,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// polling continues even while the popover is closed.
     lazy var store = MatchStore(provider: ESPNProvider(), settings: settings, notifier: notifier)
 
+    /// Owns the "open at login" registration. The OS is the source of truth
+    /// here, so this reads `SMAppService` rather than `AppSettings`.
+    let launchAtLogin = LaunchAtLoginController()
+
     /// Owns the settings window (front-most while open) and publishes whether
     /// it's open so the popover's gear icon can reflect it.
-    lazy var settingsWindow = SettingsWindowManager(settings: settings, store: store)
+    lazy var settingsWindow = SettingsWindowManager(settings: settings,
+                                                    store: store,
+                                                    launchAtLogin: launchAtLogin)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // `.accessory` keeps the app out of the Dock and the app switcher,
         // so it lives only in the menu bar.
         NSApp.setActivationPolicy(.accessory)
+
+        // Adopt whatever the system currently holds for the login item, so a
+        // change made in System Settings since the last run is reflected rather
+        // than contradicted. Deliberately does not register or unregister.
+        launchAtLogin.reconcile()
 
         // Reset the browsed day to today every time the popover opens. SwiftUI's
         // `.onAppear` fires only when the `.window`-style MenuBarExtra content is

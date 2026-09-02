@@ -50,21 +50,27 @@ The operating system's registration state SHALL be the authority on whether the 
 - **WHEN** the app launches
 - **THEN** the open-at-login toggle shows the operating system's current registration state
 
-### Requirement: Reconciliation of intent against actual state
+### Requirement: Reconciliation is adopt-only
 
-On launch, the app SHALL compare the user's persisted intent against the operating system's registration state and reconcile them. When the user's intent is on but the app is not registered — including after the installed application bundle has been replaced by an upgrade — the app SHALL re-register itself without requiring the user to toggle the setting again. When the user's intent is off but the app is registered, the app SHALL adopt the operating system's state as the user's intent rather than silently unregistering.
-
-#### Scenario: Registration lost after an upgrade is restored
-- **WHEN** the user's persisted intent is on
-- **AND** on launch the operating system reports that the app is not registered to launch at login
-- **THEN** the app registers itself again
-- **AND** the user is not required to change the toggle to restore the behavior
+On launch the app SHALL compare the user's persisted intent against the operating system's registration state. Where the two disagree, the app SHALL adopt the operating system's state as the user's intent and SHALL NOT alter the registration. The app SHALL NOT register or unregister itself at launch on the user's behalf; in particular, a registration the user has removed outside the app SHALL NOT be restored automatically.
 
 #### Scenario: Externally added registration is adopted as intent
 - **WHEN** the user's persisted intent is off
 - **AND** on launch the operating system reports that the app is registered to launch at login
 - **THEN** the app leaves the registration in place
 - **AND** the persisted intent is updated to on so the toggle and the operating system agree
+
+#### Scenario: Externally removed registration is respected
+- **WHEN** the user's persisted intent is on
+- **AND** on launch the operating system reports that the app is not registered to launch at login
+- **THEN** the app does not register itself again
+- **AND** the persisted intent is updated to off, and the toggle shows that the app does not open at login
+
+#### Scenario: Registration survives an upgrade untouched
+- **WHEN** the installed application bundle is replaced by a newer build at the same location
+- **AND** the operating system still reports the app as registered to launch at login
+- **THEN** the app continues to open at login with no user action required
+- **AND** the app does not re-register itself
 
 ### Requirement: Pending approval is surfaced to the user
 

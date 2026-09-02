@@ -101,14 +101,19 @@ mv FootballMenuBar.app /Applications/
 open /Applications/FootballMenuBar.app
 ```
 
-To launch it automatically at login, add it under
-**System Settings → General → Login Items → Open at Login**.
+To launch it automatically at login, turn on **Open at login** in the app's
+Settings window (see below). It appears under **System Settings → General →
+Login Items → Open at Login**, where it can also be removed.
 
 ## Settings
 
 Open the **Settings** window from the gear icon in the popover footer (the app
 is a Dock-less accessory, so there's no Dock menu). It offers:
 
+- **Open at login** — start Football Menu Bar automatically when you log in.
+  Off by default. The switch reflects **System Settings → General → Login
+  Items**, so removing the entry there turns it off here too, and the app never
+  re-adds itself on its own
 - **Update frequency** — pick a refresh cadence preset (Battery Saver /
   Balanced / Aggressive); each maps to a bounded live/idle poll interval
 - **Menu bar live indicator** — show a red pill on the pinned match's menu bar

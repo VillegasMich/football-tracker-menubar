@@ -18,10 +18,12 @@ final class SettingsWindowManager: NSObject, ObservableObject, NSWindowDelegate 
     private var window: NSWindow?
     private let settings: AppSettings
     private let store: MatchStore
+    private let launchAtLogin: LaunchAtLoginController
 
-    init(settings: AppSettings, store: MatchStore) {
+    init(settings: AppSettings, store: MatchStore, launchAtLogin: LaunchAtLoginController) {
         self.settings = settings
         self.store = store
+        self.launchAtLogin = launchAtLogin
     }
 
     /// Opens the window if closed, or brings it forward if already open.
@@ -42,6 +44,7 @@ final class SettingsWindowManager: NSObject, ObservableObject, NSWindowDelegate 
         let root = SettingsView()
             .environmentObject(settings)
             .environmentObject(store)
+            .environmentObject(launchAtLogin)
         let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
         window.title = "Football Settings"
@@ -74,6 +77,13 @@ final class SettingsWindowManager: NSObject, ObservableObject, NSWindowDelegate 
     }
 
     // MARK: - NSWindowDelegate
+
+    /// The user can change the login item in System Settings while this window
+    /// sits in the background, so re-read the real state every time the window
+    /// comes forward rather than trusting what was shown when it opened.
+    func windowDidBecomeKey(_ notification: Notification) {
+        launchAtLogin.refresh()
+    }
 
     func windowWillClose(_ notification: Notification) {
         isOpen = false

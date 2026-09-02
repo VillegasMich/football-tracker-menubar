@@ -10,19 +10,34 @@ Constraints that shape the approach:
 - Releases are built by `build.sh` and signed **ad hoc** (`codesign --sign -`), then distributed as a Homebrew cask that installs to `/Applications` and is upgraded by replacing the bundle in place.
 - There is no runnable test target (no Xcode in the development environment), so verification is manual, against a built bundle.
 
+### Measured behavior (change task 1, run against an ad-hoc-signed bundle)
+
+The approach below rests on findings measured on a real bundle rather than inferred from the signing setup. An earlier revision of this document predicted that ad-hoc signing would break registration across upgrades; that prediction was wrong, and the tasks that existed to work around it have been removed.
+
+| Question | Measured result |
+|---|---|
+| Does `register()` work under an ad-hoc signature? | Yes — `notRegistered → register() → enabled`, no error thrown. |
+| Is `register()` safe to call when already enabled? | Yes — idempotent, no duplicate entry created. |
+| Does a new `cdhash` (i.e. an upgrade) invalidate the registration? | **No.** A genuinely different binary at the same path still reports `enabled`. |
+| What identifies a registration, then? | The bundle identifier and path — **not** the `cdhash`, even though the ad-hoc designated requirement is a bare `cdhash` pin with no identifier clause and no Team ID. |
+| Does `status` see login items the user added by hand in System Settings? | Yes — a manually added login item reports `enabled`. |
+| Is `requiresApproval` reached on a first registration? | Not observed; registration went straight to `enabled`. |
+| Does a Homebrew-installed copy carry a quarantine attribute? | No — the cask install had none. |
+
 ## Goals / Non-Goals
 
 **Goals:**
 
-- A registration that survives the app being upgraded through Homebrew, without the user having to notice or re-toggle anything in the app.
 - A toggle that never lies: what it shows always matches what LaunchServices actually holds, including after the user changes it in System Settings.
 - Every state that is not plain on/off — pending approval, unavailable, failed — is legible in the UI rather than silent.
+- The user's own decisions about their login items are never silently overridden by the app.
 
 **Non-Goals:**
 
-- Obtaining a Developer ID signature. It would remove the re-approval prompt (see Risks), but it costs money and CI secrets, and it is a distribution decision independent of this feature.
+- Obtaining a Developer ID signature. Ad-hoc signing was measured to be sufficient for this feature, so a certificate buys nothing here; it remains a distribution decision on its own merits.
 - Registering any helper agent or daemon, or doing any work at login beyond launching the app itself.
 - Migrating the app's other settings to a two-layer state model. The pattern introduced here is specific to state the OS owns.
+- Repairing a registration the user removed. See "Reconciliation is adopt-only".
 
 ## Decisions
 
@@ -39,19 +54,25 @@ Register the main app itself, via `SMAppService.mainApp.register()` / `.unregist
 
 ### Two-layer state: persisted intent, OS actual
 
-Persist a `UserDefaults` boolean recording only what the user asked for, and read `SMAppService.mainApp.status` for what is actually true. The toggle renders from `status`, never from the persisted value alone.
+Persist a `UserDefaults` boolean recording what the user asked for, and read `SMAppService.mainApp.status` for what is actually true. The toggle renders from `status`, never from the persisted value alone.
 
-The alternative — a single `@Published var launchAtLogin: Bool` with a `didSet` writing to `UserDefaults`, matching every other setting in `AppSettings` — was rejected: it would show "on" indefinitely after the user removed the login item in System Settings.
+The alternative — a single `@Published var launchAtLogin: Bool` with a `didSet` writing to `UserDefaults`, matching every other setting in `AppSettings` — was rejected: it would show "on" indefinitely after the user removed the login item in System Settings. This is not hypothetical; `status` was measured to reflect login items added and removed outside the app.
 
-The persisted intent is still needed, and is not redundant with `status`: it is the only way to distinguish "the user wants this and the registration went missing" (re-register) from "the user never asked for this" (do nothing) when `status` reports `notRegistered` at launch.
+### Reconciliation is adopt-only
 
-### Reconcile on launch and on settings-window focus
+At launch, when `status` disagrees with the persisted intent, **the app adopts `status` as the new intent and changes nothing about the registration**. It never registers or unregisters on the user's behalf at launch.
 
-Two reconciliation points, chosen because they are the two moments the app can observe drift:
+This is a reversal from an earlier revision, which re-registered when intent was on but `status` was not `enabled`. That rule existed solely to repair registrations believed lost to upgrades. Since upgrades were measured not to lose them, the realistic way to reach "intent on, status notRegistered" is *the user deliberately removing the login item in System Settings* — and re-registering would silently override that choice. Adopting is both simpler and the only defensible behavior.
+
+The persisted intent is therefore not a repair instruction; it is what the toggle was last known to be, used to detect drift and to keep the stored value honest.
+
+### Refresh status when the settings window becomes key
+
+`status` is re-read at two moments, the two the app can observe:
 
 | Trigger | Purpose |
 |---|---|
-| Launch, from `AppDelegate` | Catch a registration lost to a bundle replacement (upgrade) and restore it; adopt an externally added registration as intent. |
+| Launch, from `AppDelegate` | Establish the initial state and adopt any drift into the persisted intent. |
 | Settings window becomes key, via the existing `NSWindowDelegate` on `SettingsWindowManager` | Catch a change the user made in System Settings while the window was open or in the background, so the toggle is correct whenever it is being looked at. |
 
 Polling `status` on a timer was rejected as disproportionate for a value that only matters while the settings window is visible.
@@ -70,11 +91,11 @@ Gate availability on `Bundle.main.bundleURL.pathExtension == "app"`. `dev.sh` bu
 
 ## Risks / Trade-offs
 
-- **Ad-hoc signing gives every release a new identity → the login item must be re-approved after each `brew upgrade --cask`.** An ad-hoc signature carries no Team ID, so the designated requirement is pinned to the bundle's `cdhash`. Each `build.sh` run produces a new `cdhash`, so LaunchServices treats each release as a different application claiming the same bundle id, and the previous registration goes stale. → *Mitigated, not solved*, by the launch-time reconciliation: the app silently re-registers itself, so the feature keeps working, at the cost of one "Login item added" notification and possibly one approval per upgrade. This is an accepted cost of ad-hoc distribution; a Developer ID signature is the real fix and is a Non-Goal here. The README must state it so the prompt is not read as a bug.
-- **Registration may fail outright under an ad-hoc signature.** Ad-hoc identities are the historically fragile case for `SMAppService`, and a cask-installed copy may additionally carry a quarantine attribute. → Verify empirically against an installed, ad-hoc-signed bundle as the first implementation task; if it fails there, the feature's viability — not just its polish — is in question, and that finding should come before any UI work. The non-fatal-failure requirement in the spec means a failure degrades to a toggle that will not stay on, rather than a crash.
-- **Stale entries can accumulate in the background-task database** for `cdhash` values no longer on disk, since the app cannot unregister a build that has already been replaced. → Not addressable from inside the app; the user can remove leftovers from System Settings. Low impact: entries point at a path that still resolves to the current app.
+- **`requiresApproval` is specified but was never reached during testing.** It arises when the user has previously disabled the item, which the spike did not reproduce. → The UI for it must still be built, since the state is reachable in normal use, but it ships less exercised than the rest. Keep its handling simple: a caption and a button to the correct System Settings pane.
+- **Registering from a bundle at an unexpected path rewrites where the login item points.** Measured during the spike: registering from a development copy repointed an existing login item away from `/Applications`. → Real users only ever run the installed copy, so this is a development hazard rather than a shipping one. It is a second reason the unbundled guard matters, and a reason not to run a registering build from a scratch directory.
+- **Stale entries can accumulate in the background-task database** for bundles no longer on disk, since the app cannot unregister a copy that has already been deleted. → Low impact and not addressable from inside the app; the user can remove leftovers from System Settings.
 - **Reconciliation adopting an external registration as intent can surprise.** If the user adds the login item from System Settings, the app flips its persisted intent to on. → This is the intended reading of "the OS is the source of truth", and the toggle visibly shows on, so the state is never hidden.
-- **`status` is read at two moments only**, so a change made in System Settings while the settings window is already frontmost is not picked up until it is refocused. → Accepted; the window is small and modal in practice, and the alternative is polling.
+- **`status` is read at two moments only**, so a change made in System Settings while the settings window is already frontmost is not picked up until it is refocused. → Accepted; the alternative is polling.
 
 ## Migration Plan
 

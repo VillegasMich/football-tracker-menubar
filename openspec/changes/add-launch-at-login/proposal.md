@@ -7,10 +7,9 @@ Football Menu Bar is a passive, always-on accessory app: it is only useful while
 - Add an **Open at login** toggle to the settings window, in a new **Startup** section above **Refresh**.
 - Register the app with `SMAppService.mainApp` (macOS 13+, matching the existing deployment floor) so it appears in **System Settings → General → Login Items → Open at Login** as the app itself — not as an opaque background item.
 - Default the setting to **off**, so the app never adds itself to Login Items without the user asking.
-- Treat the operating system as the source of truth for whether the app actually launches at login, and `UserDefaults` only as the user's remembered *intent*. Reconcile the two on launch and whenever the settings window comes to the front, so a change made in System Settings is reflected in the toggle rather than silently contradicting it.
+- Treat the operating system as the source of truth for whether the app actually launches at login, and `UserDefaults` only as a record of the user's *intent*. Re-read the operating system's state on launch and whenever the settings window comes to the front, so a change made in System Settings is reflected in the toggle rather than silently contradicting it. Where the two disagree, the app adopts the operating system's state — it never registers or unregisters on the user's behalf.
 - Surface the `requiresApproval` state with an explanatory caption and an **Open Login Items…** button that deep-links to the correct System Settings pane.
 - Disable the toggle, with an explanation, when the app is not running from an `.app` bundle (a bare `swift run`), where registration cannot succeed.
-- Document in the README that, because releases are ad-hoc signed, the app's code-signing identity changes with every build, so `brew upgrade --cask` re-registers the login item and macOS asks the user to approve it again.
 
 No breaking changes: the feature is additive and defaults off, so existing installs behave exactly as before until the user opts in.
 
@@ -31,6 +30,5 @@ No breaking changes: the feature is additive and defaults off, so existing insta
 - **`Sources/FootballMenuBar/Settings/SettingsWindowManager.swift`**: refresh the registration status when the settings window becomes key, using the existing `NSWindowDelegate` conformance.
 - **`Sources/FootballMenuBar/Views/SettingsView.swift`**: new **Startup** section.
 - **`Sources/FootballMenuBar/Settings/AppSettings.swift`**: unchanged if the controller owns its own `UserDefaults` intent key; otherwise one new key alongside the existing ones.
-- **`README.md`**: note the re-approval prompt after `brew upgrade --cask`.
-- **Accepted cost, not a defect**: ad-hoc signing gives each release a new `cdhash`, so LaunchServices treats each build as a distinct application and the login item must be re-approved after every upgrade. A Developer ID signature would remove this, and is explicitly out of scope here.
+- **No Developer ID needed**: ad-hoc signing was measured to register successfully, and a registration survives a bundle being replaced by an upgrade, so no signing change is required for this feature. See `design.md` — Measured behavior.
 - **Not testable in this environment**: registration behavior can only be verified by running the built bundle; the repo has no runnable test target.

@@ -6,9 +6,36 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: MatchStore
+    @EnvironmentObject private var launchAtLogin: LaunchAtLoginController
 
     var body: some View {
         Form {
+            Section("Startup") {
+                Toggle("Open at login", isOn: Binding(
+                    get: { launchAtLogin.state.isOn },
+                    // The OS is the source of truth: the controller re-reads the
+                    // real state after the call, so the toggle settles on what
+                    // actually happened rather than on what was asked for.
+                    set: { launchAtLogin.setEnabled($0) }))
+                    .disabled(launchAtLogin.state == .unavailable)
+
+                switch launchAtLogin.state {
+                case .unavailable:
+                    Text("Available only when running the installed Football Menu Bar.app.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .requiresApproval:
+                    Text("Awaiting approval in System Settings — Football Menu Bar won't open at login until it's allowed.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Open Login Items…") { launchAtLogin.openLoginItemsSettings() }
+                case .enabled, .disabled:
+                    Text("Starts Football Menu Bar automatically when you log in. Managed in System Settings → General → Login Items.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Refresh") {
                 Picker("Update frequency", selection: $settings.cadence) {
                     ForEach(RefreshCadence.allCases, id: \.self) { cadence in
