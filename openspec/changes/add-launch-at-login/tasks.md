@@ -25,11 +25,11 @@
 - [x] 4.1 Add a **Startup** section to `SettingsView` above **Refresh**, with an "Open at login" toggle bound to the controller — verify it appears in the settings window and that toggling it changes the entry in System Settings → Login Items
 - [x] 4.2 Disable the toggle with an explanatory caption when the app is not running from an `.app` bundle — verify under `swift run` that the toggle is greyed out with the caption shown, and under `./dev.sh` that it is enabled
 - [x] 4.3 Show the pending-approval caption and an "Open Login Items…" button calling `SMAppService.openSystemSettingsLoginItems()` when status is `requiresApproval` — verify the button opens the Login Items pane, and that the caption disappears after approving and refocusing the window
-- [ ] 4.4 Verify the section matches the surrounding conventions — `.font(.caption)` / `.foregroundStyle(.secondary)` captions and the existing `Form`/`Section` grouping — and that the window still lays out at its fixed 360pt width
+- [x] 4.4 Verify the section matches the surrounding conventions — `.font(.caption)` / `.foregroundStyle(.secondary)` captions and the existing `Form`/`Section` grouping — and that the window still lays out at its fixed 360pt width
 
 ## 5. Documentation and cleanup
 
 - [x] 5.1 Remove the temporary registration call added in task 1.2 and verify `swift build` succeeds with no leftover scaffolding
 - [x] 5.2 Add a README note that the app can be set to open at login from Settings, and that the setting is managed in System Settings → General → Login Items — verify the note matches the shipped UI wording
-- [ ] 5.3 Run `openspec validate --strict add-launch-at-login` and verify it passes
+- [x] 5.3 Run `openspec validate --strict add-launch-at-login` and verify it passes
 - [ ] 5.4 End-to-end verification: with the toggle on, log out and back in, and confirm the app starts automatically with its menu bar item present
