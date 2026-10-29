@@ -67,6 +67,9 @@ struct MatchListView: View {
                 .help("Refresh now")
             }
         }
+        // Pinned so the spinner/refresh swap and the "Today" text/button swap
+        // can't change the header's height (see `contentHeight`).
+        .frame(height: Self.headerRowHeight)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
@@ -89,37 +92,40 @@ struct MatchListView: View {
 
     // MARK: - Content
 
-    @ViewBuilder
-    private var content: some View {
-        let groups = store.matchesByLeague
-        if let error = store.errorMessage, store.matches.isEmpty {
-            errorState(error)
-        } else if groups.isEmpty {
-            emptyState
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(groups, id: \.league.id) { group in
-                        leagueSection(group.league, matches: group.matches)
-                    }
-                }
-                .padding(.vertical, 10)
-            }
-            // A vertical ScrollView has no intrinsic height; inside the
-            // self-sizing MenuBarExtra window it would collapse to zero and the
-            // list would look empty. Give it a concrete, content-aware height.
-            .frame(height: scrollHeight(for: groups))
-        }
-    }
+    /// Fixed height of the area between the header and footer, shared by the
+    /// list, empty and error states.
+    private static let contentHeight: CGFloat = 360
 
-    /// Height for the scroll area sized to its content (rows + league
-    /// headers), bounded so a busy matchday scrolls rather than growing the
-    /// popover without limit.
-    private func scrollHeight(for groups: [(league: League, matches: [Match])]) -> CGFloat {
-        let rows = groups.reduce(0) { $0 + $1.matches.count }
-        let headers = groups.count
-        let estimate = CGFloat(rows) * 36 + CGFloat(headers) * 28 + 20
-        return min(max(estimate, 80), 400)
+    /// Fixed height of the header row's controls, for the same reason as
+    /// `contentHeight`.
+    private static let headerRowHeight: CGFloat = 32
+
+    private var content: some View {
+        Group {
+            let groups = store.matchesByLeague
+            if let error = store.errorMessage, store.matches.isEmpty {
+                errorState(error)
+            } else if groups.isEmpty {
+                emptyState
+            } else {
+                // Fills the fixed area: short lists sit at the top, long ones
+                // scroll.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(groups, id: \.league.id) { group in
+                            leagueSection(group.league, matches: group.matches)
+                        }
+                    }
+                    .padding(.vertical, 10)
+                }
+            }
+        }
+        // The MenuBarExtra window sizes itself to its content, and if it
+        // resizes while open AppKit keeps its bottom edge fixed, so the top
+        // drifts off the menu bar. A constant height (rather than one sized to
+        // the content) prevents that. Non-list states are centred within it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(height: Self.contentHeight)
     }
 
     private func leagueSection(_ league: League, matches: [Match]) -> some View {
