@@ -321,7 +321,8 @@ final class MatchStore: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Live matches first, then upcoming, then finished; within each, by kickoff.
+    /// Live matches first, then upcoming, then finished (Postponed and
+    /// Cancelled sort with finished); within each, by kickoff.
     private static func displayOrder(_ a: Match, _ b: Match) -> Bool {
         func rank(_ s: MatchState) -> Int {
             switch s { case .inProgress: return 0; case .upcoming: return 1; case .finished, .postponed, .cancelled: return 2 }

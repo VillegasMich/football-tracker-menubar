@@ -11,6 +11,17 @@ enum MatchState: String, Codable, Sendable {
     /// Will not be played at all.
     case cancelled
 
+    /// The word shown in place of a score for a Match that was never played:
+    /// "Postponed" or "Cancelled" (the Primary Source spells it "Canceled").
+    /// `nil` for every other status.
+    var unplayedStatusWord: String? {
+        switch self {
+        case .postponed: return "Postponed"
+        case .cancelled: return "Cancelled"
+        case .upcoming, .inProgress, .finished: return nil
+        }
+    }
+
     /// Maps an ESPN status type to a `MatchState`. The one place this mapping
     /// lives:
     /// - `STATUS_POSTPONED` → Postponed; `STATUS_CANCELED` → Cancelled. Both

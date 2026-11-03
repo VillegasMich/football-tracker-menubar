@@ -41,10 +41,8 @@ enum MenuBarTitle {
             return f.string(from: match.kickoff)
         case .inProgress, .finished:
             return match.score.display
-        case .postponed:
-            return "Postponed"
-        case .cancelled:
-            return "Cancelled"
+        case .postponed, .cancelled:
+            return match.state.unplayedStatusWord ?? match.statusDetail
         }
     }
 }

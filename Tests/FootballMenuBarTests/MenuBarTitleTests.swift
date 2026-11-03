@@ -61,12 +61,15 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.middle(for: upcoming, locale: britishEnglish, timeZone: madrid) == "20:00")
     }
 
-    @Test("The logo-mode title shows the status word for Postponed and Cancelled Matches")
-    func logoModeMiddleSegmentPostponedAndCancelled() {
-        let postponed = makeMatch(state: .postponed, statusDetail: "Postponed")
-        let cancelled = makeMatch(state: .cancelled, statusDetail: "Canceled")
+    @Test("The logo-mode title shows the status word for Postponed and Cancelled Matches",
+          arguments: [
+              (MatchState.postponed, "Postponed", "Postponed"),
+              (.cancelled, "Canceled", "Cancelled"),
+          ])
+    func logoModeMiddleSegmentPostponedAndCancelled(state: MatchState, primarySourceDetail: String,
+                                                    middle: String) {
+        let match = makeMatch(state: state, statusDetail: primarySourceDetail)
 
-        #expect(MenuBarTitle.middle(for: postponed) == "Postponed")
-        #expect(MenuBarTitle.middle(for: cancelled) == "Cancelled")
+        #expect(MenuBarTitle.middle(for: match) == middle)
     }
 }

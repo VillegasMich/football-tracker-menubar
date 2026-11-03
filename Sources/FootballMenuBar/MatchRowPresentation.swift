@@ -39,7 +39,6 @@ struct MatchRowPresentation {
         isLiveStyle = match.isLive
         emphasisedTeam = nil
         offersHighlights = match.state == .finished
-        let goals = ScoreText.goals(home: "\(match.score.home)", away: "\(match.score.away)")
         switch match.state {
         case .upcoming:
             score = .dash
@@ -53,16 +52,12 @@ struct MatchRowPresentation {
                 badgeText = match.statusDetail
             }
         case .inProgress, .finished:
-            score = goals
+            score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
             badgeText = match.statusDetail
-        case .postponed:
+        case .postponed, .cancelled:
             // Never played, so no score; our own word, not the Primary Source's.
             score = .dash
-            badgeText = "Postponed"
-        case .cancelled:
-            // The Primary Source spells it "Canceled".
-            score = .dash
-            badgeText = "Cancelled"
+            badgeText = match.state.unplayedStatusWord ?? match.statusDetail
         }
     }
 }
