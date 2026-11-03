@@ -85,7 +85,13 @@ private struct Event: Decodable {
     struct Status: Decodable {
         let type: StatusType
         struct StatusType: Decodable {
+            /// e.g. `STATUS_FULL_TIME`, `STATUS_POSTPONED`. Optional so an
+            /// absent name never fails decoding.
+            let name: String?
             let state: String
+            /// Whether the Match was played to its end. Optional so an absent
+            /// flag never fails decoding; absent never means Finished.
+            let completed: Bool?
             let shortDetail: String?
             let detail: String?
         }
@@ -136,7 +142,9 @@ private struct Event: Decodable {
             home: home,
             away: away,
             score: score,
-            state: MatchState(espnState: status.type.state),
+            state: MatchState(espnName: status.type.name,
+                              state: status.type.state,
+                              completed: status.type.completed),
             statusDetail: status.type.shortDetail ?? status.type.detail ?? "",
             kickoff: Self.parseDate(date) ?? .distantFuture
         )

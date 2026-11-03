@@ -38,7 +38,7 @@ enum MenuBarTitle {
             f.dateStyle = .none
             f.timeStyle = .short
             return f.string(from: match.kickoff)
-        case .inProgress, .finished:
+        case .inProgress, .finished, .postponed, .cancelled:
             return match.score.display
         }
     }

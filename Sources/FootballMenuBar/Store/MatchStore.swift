@@ -324,7 +324,7 @@ final class MatchStore: ObservableObject {
     /// Live matches first, then upcoming, then finished; within each, by kickoff.
     private static func displayOrder(_ a: Match, _ b: Match) -> Bool {
         func rank(_ s: MatchState) -> Int {
-            switch s { case .inProgress: return 0; case .upcoming: return 1; case .finished: return 2 }
+            switch s { case .inProgress: return 0; case .upcoming: return 1; case .finished, .postponed, .cancelled: return 2 }
         }
         if rank(a.state) != rank(b.state) { return rank(a.state) < rank(b.state) }
         return a.kickoff < b.kickoff

@@ -23,9 +23,67 @@ struct ESPNProviderTests {
         #expect(match.statusDetail == "FT")
         #expect(match.kickoff == utc("2026-11-01T16:30Z"))
     }
+
+    @Test("A Postponed Match decodes as Postponed, not Finished")
+    func postponedMatch() async throws {
+        // FA Cup qualifying, 11 Aug 2026: Kidsgrove Athletic at Abbey Hulton
+        // United, `STATUS_POSTPONED` with state `post` and `completed: false`.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 11))
+
+        let match = try #require(matches.first { $0.id == "401906752" })
+        #expect(match.state == .postponed)
+    }
+
+    @Test("A Cancelled Match decodes as Cancelled, not Finished")
+    func cancelledMatch() async throws {
+        // FA Cup qualifying, 8 Aug 2026: Boro Rangers at Marske United,
+        // `STATUS_CANCELED` with state `post` and `completed: false`.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 8))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401890832")
+        #expect(match.state == .cancelled)
+    }
+
+    @Test("A Match that went to extra time still decodes as Finished")
+    func extraTimeMatch() async throws {
+        // FA Cup qualifying, 11 Aug 2026: Worcester Raiders at Ashby Ivanhoe,
+        // 3–1 after extra time (`STATUS_FINAL_AET`, `completed: true`).
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 11))
+
+        let match = try #require(matches.first { $0.id == "401906755" })
+        #expect(match.state == .finished)
+        #expect(match.score == Score(home: 3, away: 1))
+        #expect(match.statusDetail == "AET")
+    }
+
+    @Test("A Match with an unrecognised status name is kept and decodes as Upcoming, not Finished")
+    func unrecognisedStatusName() async throws {
+        // EDITED fixture, not a verbatim response: the real Postponed Match
+        // above (Kidsgrove Athletic at Abbey Hulton United, 11 Aug 2026) with
+        // only `status.type.name` changed to the invented
+        // `STATUS_UNRECOGNISED_EDITED_FOR_TEST`. State stays `post` and
+        // `completed` stays false. No real unknown name has been observed.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedStatus], on: localDay(2026, 8, 11))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401906752")
+        #expect(match.state == .upcoming)
+    }
 }
 
 private let premierLeague = League(slug: "eng.1", displayName: "Premier League")
+private let faCupQualifying = League(slug: "eng.fa_qual", displayName: "FA Cup Qualifying")
+/// Test-only slug serving fixtures edited from real responses.
+private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")
 
 fileprivate extension Array {
     /// The single element, or `nil` when there are zero or several.
