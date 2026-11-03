@@ -39,17 +39,30 @@ struct MatchRowPresentation {
         isLiveStyle = match.isLive
         emphasisedTeam = nil
         offersHighlights = match.state == .finished
-        score = match.state == .upcoming
-            ? .dash
-            : .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-        if match.state == .upcoming, match.kickoff != .distantFuture {
-            let f = DateFormatter()
-            f.locale = locale
-            f.timeZone = timeZone
-            f.setLocalizedDateFormatFromTemplate("j mm")
-            badgeText = f.string(from: match.kickoff)
-        } else {
+        let goals = ScoreText.goals(home: "\(match.score.home)", away: "\(match.score.away)")
+        switch match.state {
+        case .upcoming:
+            score = .dash
+            if match.kickoff != .distantFuture {
+                let f = DateFormatter()
+                f.locale = locale
+                f.timeZone = timeZone
+                f.setLocalizedDateFormatFromTemplate("j mm")
+                badgeText = f.string(from: match.kickoff)
+            } else {
+                badgeText = match.statusDetail
+            }
+        case .inProgress, .finished:
+            score = goals
             badgeText = match.statusDetail
+        case .postponed:
+            // Never played, so no score; our own word, not the Primary Source's.
+            score = .dash
+            badgeText = "Postponed"
+        case .cancelled:
+            // The Primary Source spells it "Canceled".
+            score = .dash
+            badgeText = "Cancelled"
         }
     }
 }
