@@ -243,6 +243,8 @@ private struct MatchRow: View {
     private var isPinned: Bool { store.pinnedMatchID == match.id }
 
     var body: some View {
+        // Everything this row shows about the Match is decided outside the view.
+        let presentation = MatchRowPresentation(match: match)
         HStack(alignment: .center, spacing: 8) {
             pinButton
             VStack(alignment: .leading, spacing: 2) {
@@ -252,16 +254,17 @@ private struct MatchRow: View {
             .font(.subheadline)
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                if match.state == .upcoming {
+                switch presentation.score {
+                case .dash:
                     Text("—").foregroundStyle(.secondary)
-                } else {
-                    Text("\(match.score.home)").fontWeight(match.isLive ? .bold : .regular)
-                    Text("\(match.score.away)").fontWeight(match.isLive ? .bold : .regular)
+                case let .goals(home, away):
+                    Text(home).fontWeight(presentation.isLiveStyle ? .bold : .regular)
+                    Text(away).fontWeight(presentation.isLiveStyle ? .bold : .regular)
                 }
             }
             .font(.subheadline.monospacedDigit())
-            statusBadge
-            if match.state == .finished {
+            statusBadge(presentation)
+            if presentation.offersHighlights {
                 highlightsButton
             }
         }
@@ -316,8 +319,7 @@ private struct MatchRow: View {
     }
 
     /// Opens the fixture's YouTube highlights search in the default browser.
-    /// Only rendered for finished matches (see body); upcoming and in-progress
-    /// rows never show it.
+    /// Only rendered when the presentation offers highlights (see body).
     private var highlightsButton: some View {
         Button {
             NSWorkspace.shared.open(match.highlightsSearchURL)
@@ -330,29 +332,13 @@ private struct MatchRow: View {
         .help("Watch highlights")
     }
 
-    /// Local kickoff time for scheduled matches, e.g. `7:00 PM`.
-    private static let kickoffTimeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.setLocalizedDateFormatFromTemplate("j mm")
-        return f
-    }()
-
-    /// For upcoming matches ESPN's `shortDetail` is unreliable (often just a
-    /// date), so show the kickoff time derived from `match.kickoff` instead.
-    private var badgeText: String {
-        if match.state == .upcoming, match.kickoff != .distantFuture {
-            return Self.kickoffTimeFormatter.string(from: match.kickoff)
-        }
-        return match.statusDetail
-    }
-
-    private var statusBadge: some View {
-        Text(badgeText)
+    private func statusBadge(_ presentation: MatchRowPresentation) -> some View {
+        Text(presentation.badgeText)
             .font(.caption2)
-            .foregroundStyle(match.isLive ? .white : .secondary)
+            .foregroundStyle(presentation.isLiveStyle ? .white : .secondary)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(match.isLive ? Color.red : Color.clear, in: Capsule())
+            .background(presentation.isLiveStyle ? Color.red : Color.clear, in: Capsule())
             .frame(minWidth: 44, alignment: .trailing)
     }
 }
