@@ -48,7 +48,28 @@ Suggested structure as the app grows (not yet created):
   UI (match lists, league picker) is needed instead of a plain dropdown menu.
 
 ## Open decisions / TODO
-- Choose a football data API (e.g. football-data.org, API-Football) and how the
-  API key is supplied/stored. Not yet selected.
-- Define the initial set of supported leagues.
+- ~~Choose a football data API.~~ Decided: ESPN is the Primary Source, with
+  OpenLigaDB as a Backup Source for German Competitions. See
+  `docs/adr/0001-espn-primary-source-openligadb-backup.md`.
+- ~~Define the initial set of supported leagues.~~ Decided: a curated list of 36
+  Competitions, specified in the Followed Competitions spec (GitHub issue).
 - Decide the live-score refresh cadence and how to back off when idle.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues (`VillegasMich/football-tracker-menubar`), managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Specs
+
+New specs live as GitHub issues (see above). `openspec/` is a frozen historical
+record: do not update it or use the `/opsx:*` commands for new work.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
