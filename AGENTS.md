@@ -21,12 +21,25 @@ matches and scores from just those leagues.
 swift build      # compile
 swift run        # launch (⚽ appears in the menu bar)
 ```
-There is no test target yet. When adding one, use `swift test`.
+
+## Tests
+```sh
+./test.sh                     # run the whole suite (Swift Testing)
+./test.sh --filter <name>     # run matching tests; extra args go to `swift test`
+```
+Use `./test.sh`, not plain `swift test`. With only the Command Line Tools
+installed, `swift test` fails with "no such module 'Testing'" because Swift
+Testing lives in the CLT's Developer directory, which SwiftPM doesn't search.
+The script adds that framework path (compile, link and rpath) when the active
+developer directory is the Command Line Tools, and is plain `swift test` with
+full Xcode. Tests live in `Tests/FootballMenuBarTests` and must run offline:
+Primary Source responses come from saved fixtures in `Fixtures/`.
 
 ## Project layout
 | Path | Purpose |
 | --- | --- |
-| `Package.swift` | SPM manifest, macOS 13+ executable target |
+| `Package.swift` | SPM manifest, macOS 13+ executable target and test target |
+| `test.sh` | Runs the test suite (see Tests) |
 | `Sources/FootballMenuBar/FootballMenuBarApp.swift` | `@main` entry + `AppDelegate` (hides Dock icon) |
 | `Sources/FootballMenuBar/MenuContent.swift` | Menu bar dropdown contents |
 

@@ -10,6 +10,12 @@ let package = Package(
         .executableTarget(
             name: "FootballMenuBar",
             path: "Sources/FootballMenuBar"
-        )
+        ),
+        .testTarget(
+            name: "FootballMenuBarTests",
+            dependencies: ["FootballMenuBar"],
+            path: "Tests/FootballMenuBarTests",
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )
