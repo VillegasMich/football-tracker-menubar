@@ -31,6 +31,17 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.text(for: match) == "ARS 2 – 3 CHE")
     }
 
+    @Test("Postponed and Cancelled Matches show the status word in place of the score",
+          arguments: [
+              (MatchState.postponed, "Postponed", "ARS Postponed CHE"),
+              (.cancelled, "Canceled", "ARS Cancelled CHE"),
+          ])
+    func postponedAndCancelledShowStatusWord(state: MatchState, primarySourceDetail: String, title: String) {
+        let match = makeMatch(state: state, statusDetail: primarySourceDetail, score: Score(home: 0, away: 0))
+
+        #expect(MenuBarTitle.text(for: match) == title)
+    }
+
     @Test("Abbreviation overrides replace the Primary Source's abbreviations, uppercased")
     func abbreviationOverrides() {
         let match = makeMatch(state: .finished, statusDetail: "FT", score: Score(home: 2, away: 3))
@@ -48,5 +59,14 @@ struct MenuBarTitleTests {
 
         #expect(MenuBarTitle.middle(for: live) == "1 – 0")
         #expect(MenuBarTitle.middle(for: upcoming, locale: britishEnglish, timeZone: madrid) == "20:00")
+    }
+
+    @Test("The logo-mode title shows the status word for Postponed and Cancelled Matches")
+    func logoModeMiddleSegmentPostponedAndCancelled() {
+        let postponed = makeMatch(state: .postponed, statusDetail: "Postponed")
+        let cancelled = makeMatch(state: .cancelled, statusDetail: "Canceled")
+
+        #expect(MenuBarTitle.middle(for: postponed) == "Postponed")
+        #expect(MenuBarTitle.middle(for: cancelled) == "Cancelled")
     }
 }

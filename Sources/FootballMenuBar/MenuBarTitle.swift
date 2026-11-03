@@ -8,6 +8,7 @@ enum MenuBarTitle {
     /// Title for the pinned match, or `nil` when there is nothing to show.
     /// - live / finished: `"ARS 1 – 0 CHE"` (abbreviations + score)
     /// - upcoming: `"ARS 7:00 PM CHE"` (abbreviations + kickoff time)
+    /// - postponed / cancelled: `"ARS Postponed CHE"`, `"ARS Cancelled CHE"`
     ///
     /// `abbreviation` resolves each team's displayed abbreviation, so callers can
     /// route it through the per-team overrides. Defaults to the team's own
@@ -25,7 +26,7 @@ enum MenuBarTitle {
 
     /// The state-dependent middle segment shared by the text title and the
     /// logo-mode title: the score while in-progress/finished, the kickoff time
-    /// while upcoming.
+    /// while upcoming, and the status word when postponed or cancelled.
     static func middle(for match: Match,
                        locale: Locale = .autoupdatingCurrent,
                        timeZone: TimeZone = .autoupdatingCurrent) -> String {
@@ -38,8 +39,12 @@ enum MenuBarTitle {
             f.dateStyle = .none
             f.timeStyle = .short
             return f.string(from: match.kickoff)
-        case .inProgress, .finished, .postponed, .cancelled:
+        case .inProgress, .finished:
             return match.score.display
+        case .postponed:
+            return "Postponed"
+        case .cancelled:
+            return "Cancelled"
         }
     }
 }
