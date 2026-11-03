@@ -27,7 +27,7 @@ struct ESPNProviderTests {
 
 private let premierLeague = League(slug: "eng.1", displayName: "Premier League")
 
-extension Array {
+fileprivate extension Array {
     /// The single element, or `nil` when there are zero or several.
     var only: Element? { count == 1 ? first : nil }
 }

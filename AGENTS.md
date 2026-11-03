@@ -33,13 +33,18 @@ Testing lives in the CLT's Developer directory, which SwiftPM doesn't search.
 The script adds that framework path (compile, link and rpath) when the active
 developer directory is the Command Line Tools, and is plain `swift test` with
 full Xcode. Tests live in `Tests/FootballMenuBarTests` and must run offline:
-Primary Source responses come from saved fixtures in `Fixtures/`.
+responses from the Primary Source are saved real JSON files under
+`Tests/FootballMenuBarTests/Fixtures/ESPN/{slug}/{YYYYMMDD}.json`, served to
+`ESPNProvider` through a stub `URLSession`.
 
 ## Project layout
 | Path | Purpose |
 | --- | --- |
 | `Package.swift` | SPM manifest, macOS 13+ executable target and test target |
 | `test.sh` | Runs the test suite (see Tests) |
+| `Sources/FootballMenuBar/MenuBarTitle.swift` | Pure builder for the Pinned Match's menu bar title |
+| `Sources/FootballMenuBar/MatchRowPresentation.swift` | Pure presentation of a single Match row |
+| `Tests/FootballMenuBarTests/` | Swift Testing suite and saved Primary Source responses |
 | `Sources/FootballMenuBar/FootballMenuBarApp.swift` | `@main` entry + `AppDelegate` (hides Dock icon) |
 | `Sources/FootballMenuBar/MenuContent.swift` | Menu bar dropdown contents |
 

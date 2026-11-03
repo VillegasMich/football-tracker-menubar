@@ -13,13 +13,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-F=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
-L=/Library/Developer/CommandLineTools/Library/Developer/usr/lib
+CLT_FRAMEWORKS=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
+CLT_LIBS=/Library/Developer/CommandLineTools/Library/Developer/usr/lib
 
 flags=()
-if [[ "$(xcode-select -p 2>/dev/null || true)" == /Library/Developer/CommandLineTools && -d "$F" ]]; then
-  flags+=(-Xswiftc -F -Xswiftc "$F" -Xlinker -F -Xlinker "$F"
-          -Xlinker -rpath -Xlinker "$F" -Xlinker -rpath -Xlinker "$L")
+if [[ "$(xcode-select -p 2>/dev/null || true)" == /Library/Developer/CommandLineTools && -d "$CLT_FRAMEWORKS" ]]; then
+  flags+=(-Xswiftc -F -Xswiftc "$CLT_FRAMEWORKS" -Xlinker -F -Xlinker "$CLT_FRAMEWORKS"
+          -Xlinker -rpath -Xlinker "$CLT_FRAMEWORKS" -Xlinker -rpath -Xlinker "$CLT_LIBS")
 fi
 
 swift test ${flags[@]+"${flags[@]}"} "$@"

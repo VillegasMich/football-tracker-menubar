@@ -13,6 +13,7 @@ struct MatchRowPresentationTests {
         let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
 
         #expect(row.badgeText == "20:00")
+        #expect(!row.isLiveStyle)
     }
 
     @Test("A Live Match shows the live detail in the Live style")
@@ -28,11 +29,12 @@ struct MatchRowPresentationTests {
     @Test("An Upcoming Match without a kickoff date shows the Primary Source's detail")
     func upcomingWithoutKickoffShowsDetail() {
         // `.distantFuture` is what decoding yields when the kickoff can't be parsed.
-        let match = makeMatch(state: .upcoming, statusDetail: "TBD", kickoff: .distantFuture)
+        let match = makeMatch(state: .upcoming, statusDetail: "Sun, November 1st at 2:00 PM EST",
+                              kickoff: .distantFuture)
 
         let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
 
-        #expect(row.badgeText == "TBD")
+        #expect(row.badgeText == "Sun, November 1st at 2:00 PM EST")
         #expect(!row.isLiveStyle)
     }
 

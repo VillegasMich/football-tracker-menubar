@@ -36,7 +36,7 @@ struct MatchRowPresentation {
     init(match: Match,
          locale: Locale = .autoupdatingCurrent,
          timeZone: TimeZone = .autoupdatingCurrent) {
-        isLiveStyle = match.state == .inProgress
+        isLiveStyle = match.isLive
         emphasisedTeam = nil
         offersHighlights = match.state == .finished
         score = match.state == .upcoming
