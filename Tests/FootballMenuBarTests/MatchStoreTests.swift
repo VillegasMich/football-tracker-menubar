@@ -393,8 +393,8 @@ final class MatchStoreTests {
 
     @Test("A pin saved without its Competition is restored from the Followed Competitions, and its Competition is saved once found")
     func pinWithoutCompetitionRestoredFromFollowed() async {
-        defaults.set(arsenalChelsea.id, forKey: "pinnedMatchID")
-        defaults.set(dayKey(todayKickoff), forKey: "pinnedMatchDay")
+        defaults.set(arsenalChelsea.id, forKey: pinnedMatchIDKey)
+        defaults.set(dayKey(todayKickoff), forKey: pinnedMatchDayKey)
         provider.succeed(premierLeague, with: [arsenalChelsea])
         let store = makeStore()
 
@@ -411,6 +411,21 @@ final class MatchStoreTests {
 
         #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
         #expect(relaunched.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("A pin saved without its day saves the Match's day once found, so its unfollowed Competition stops being requested after that day")
+    func pinWithoutDayStopsRequestingAfterItsDay() async {
+        defaults.set(yesterdayArsenalChelsea.id, forKey: pinnedMatchIDKey)
+        provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
+        let store = makeStore()
+        await store.loadInitial()
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        await makeStore().loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(3) == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
     }
 
     @Test("A refresh tick while browsing the pinned day still fetches the unfollowed Pinned Match's Competition, alone, for the ticker")
@@ -450,6 +465,10 @@ final class MatchStoreTests {
 
 /// Where the settings store the Followed Competitions' slugs.
 private let followedCompetitionsKey = "settings.followedCompetitions"
+/// Where a pin saved before its Competition was stored keeps its id and day
+/// (older pins have no day).
+private let pinnedMatchIDKey = "pinnedMatchID"
+private let pinnedMatchDayKey = "pinnedMatchDay"
 
 private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League", region: .england)
 private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
@@ -458,10 +477,10 @@ private let worldCup = Competition(slug: "fifa.world", displayName: "World Cup",
 
 /// A day as the store saves a pin's day: `yyyy-MM-dd`, local.
 private func dayKey(_ date: Date) -> String {
-    let f = DateFormatter()
-    f.locale = Locale(identifier: "en_US_POSIX")
-    f.dateFormat = "yyyy-MM-dd"
-    return f.string(from: date)
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: date)
 }
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
