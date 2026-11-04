@@ -65,7 +65,7 @@ final class MatchStore: ObservableObject {
 
     /// The Followed Competitions, in catalogue order: what is requested and
     /// listed.
-    @Published private(set) var competitions: [Competition]
+    @Published private(set) var followedCompetitions: [Competition]
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
     /// User configuration; the poll loop reads the cadence from it each tick.
@@ -91,7 +91,7 @@ final class MatchStore: ObservableObject {
          settings: AppSettings = AppSettings(),
          notifier: MatchNotifier? = nil) {
         self.provider = provider
-        self.competitions = settings.followedCompetitions
+        self.followedCompetitions = settings.followedCompetitions
         self.defaults = defaults
         self.settings = settings
         self.notifier = notifier
@@ -115,7 +115,7 @@ final class MatchStore: ObservableObject {
     /// leave the list at once, and the browsed day is refreshed straight away
     /// so a newly followed Competition's Matches appear.
     private func followedCompetitionsChanged(to followed: [Competition]) {
-        competitions = followed
+        followedCompetitions = followed
         let followedSlugs = Set(followed.map(\.slug))
         lastMatchesBySlug = lastMatchesBySlug.filter { followedSlugs.contains($0.key) }
         loadStatusBySlug = loadStatusBySlug.filter { followedSlugs.contains($0.key) }
@@ -201,7 +201,7 @@ final class MatchStore: ObservableObject {
     /// Matches is left out unless it failed to load, so the list can say so.
     var matchesByCompetition: [(competition: Competition, status: CompetitionLoadStatus, matches: [Match])] {
         let visible = visibleMatches
-        return competitions.compactMap { competition in
+        return followedCompetitions.compactMap { competition in
             let group = visible
                 .filter { $0.competitionSlug == competition.slug }
                 .sorted(by: Self.displayOrder)
@@ -317,7 +317,7 @@ final class MatchStore: ObservableObject {
     /// Load the browse feed for `target`. Results are discarded if the selected
     /// day changed while the fetch was in flight (out-of-order guard).
     private func loadBrowse(for target: Date) async {
-        let requested = competitions
+        let requested = followedCompetitions
         let results = await provider.matches(for: requested, on: target)
         guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
         applyBrowseResults(results, requested: requested, for: target)
@@ -341,7 +341,7 @@ final class MatchStore: ObservableObject {
             lastMatchesDay = day
         }
 
-        let followedSlugs = Set(competitions.map(\.slug))
+        let followedSlugs = Set(followedCompetitions.map(\.slug))
         var statuses = isSameDay ? loadStatusBySlug : [:]
         var firstFailure: MatchDataError?
         for competition in requested where followedSlugs.contains(competition.slug) {
@@ -357,7 +357,7 @@ final class MatchStore: ObservableObject {
             }
         }
 
-        matches = competitions.flatMap { lastMatchesBySlug[$0.slug] ?? [] }
+        matches = followedCompetitions.flatMap { lastMatchesBySlug[$0.slug] ?? [] }
         loadStatusBySlug = statuses
         let everyCompetitionFailed = !statuses.isEmpty && !statuses.values.contains(.loaded)
         errorMessage = everyCompetitionFailed && matches.isEmpty ? Self.describe(firstFailure) : nil
@@ -377,7 +377,7 @@ final class MatchStore: ObservableObject {
     /// seed from a live poll tick for notification purposes.
     private func refreshTicker(source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
-        let results = await provider.matches(for: competitions, on: pinnedDay)
+        let results = await provider.matches(for: followedCompetitions, on: pinnedDay)
         updateSnapshot(from: results, id: id, source: source)
     }
 

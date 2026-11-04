@@ -28,6 +28,11 @@ struct Competition: Codable, Identifiable, Hashable, Sendable {
             case .fifa: return "FIFA"
             }
         }
+
+        /// The catalogue's Competitions in this region, in catalogue order.
+        var competitions: [Competition] {
+            Competition.catalogue.filter { $0.region == self }
+        }
     }
 }
 
@@ -78,7 +83,12 @@ extension Competition {
     /// The Followed Competitions on first launch, and whenever nothing valid
     /// is stored: the three the app showed before the picker existed, in
     /// catalogue order.
-    static let defaultFollowed: [Competition] = catalogue.filter {
-        ["fifa.world", "eng.1", "uefa.champions"].contains($0.slug)
+    static let defaultFollowed = inCatalogue(slugs: ["fifa.world", "eng.1", "uefa.champions"])
+
+    /// The catalogue's Competitions with these slugs, in catalogue order.
+    /// Slugs not in the catalogue are ignored.
+    static func inCatalogue(slugs: some Sequence<String>) -> [Competition] {
+        let slugs = Set(slugs)
+        return catalogue.filter { slugs.contains($0.slug) }
     }
 }

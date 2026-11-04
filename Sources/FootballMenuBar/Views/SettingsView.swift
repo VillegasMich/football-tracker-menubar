@@ -17,7 +17,7 @@ struct SettingsView: View {
                 ForEach(Competition.Region.allCases, id: \.self) { region in
                     // Collapsed by default, so the window stays small.
                     DisclosureGroup(region.displayName) {
-                        ForEach(Competition.catalogue.filter { $0.region == region }) { competition in
+                        ForEach(region.competitions) { competition in
                             CompetitionToggle(competition: competition)
                         }
                     }

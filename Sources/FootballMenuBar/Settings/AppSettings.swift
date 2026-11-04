@@ -107,8 +107,7 @@ final class AppSettings: ObservableObject {
         // is ignored rather than crashing.
         let raw = defaults.dictionary(forKey: Key.abbreviationOverrides) ?? [:]
         self.abbreviationOverrides = raw.compactMapValues { $0 as? String }
-        let followedSlugs = Set(defaults.stringArray(forKey: Key.followedCompetitions) ?? [])
-        let followed = Competition.catalogue.filter { followedSlugs.contains($0.slug) }
+        let followed = Competition.inCatalogue(slugs: defaults.stringArray(forKey: Key.followedCompetitions) ?? [])
         self.followedCompetitions = followed.isEmpty ? Competition.defaultFollowed : followed
     }
 
@@ -137,7 +136,7 @@ final class AppSettings: ObservableObject {
     }
 
     private func setFollowed(_ competitions: [Competition]) {
-        followedCompetitions = Competition.catalogue.filter(competitions.contains)
+        followedCompetitions = Competition.inCatalogue(slugs: competitions.map(\.slug))
     }
 
     // MARK: - Abbreviation overrides
