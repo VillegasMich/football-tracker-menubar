@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The menu bar popover contents: matches grouped by league, with refresh and
+/// The menu bar popover contents: matches grouped by Competition, with refresh and
 /// quit controls, plus empty and error states.
 struct MatchListView: View {
     @EnvironmentObject private var store: MatchStore
@@ -102,7 +102,7 @@ struct MatchListView: View {
 
     private var content: some View {
         Group {
-            let groups = store.matchesByLeague
+            let groups = store.matchesByCompetition
             if let error = store.errorMessage, store.matches.isEmpty {
                 errorState(error)
             } else if groups.isEmpty {
@@ -112,8 +112,8 @@ struct MatchListView: View {
                 // scroll.
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        ForEach(groups, id: \.league.id) { group in
-                            leagueSection(group.league, matches: group.matches)
+                        ForEach(groups, id: \.competition.id) { group in
+                            competitionSection(group.competition, matches: group.matches)
                         }
                     }
                     .padding(.vertical, 10)
@@ -128,9 +128,9 @@ struct MatchListView: View {
         .frame(height: Self.contentHeight)
     }
 
-    private func leagueSection(_ league: League, matches: [Match]) -> some View {
+    private func competitionSection(_ competition: Competition, matches: [Match]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(league.displayName.uppercased())
+            Text(competition.displayName.uppercased())
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)

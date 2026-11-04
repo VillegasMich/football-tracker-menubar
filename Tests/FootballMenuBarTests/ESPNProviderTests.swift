@@ -13,7 +13,7 @@ struct ESPNProviderTests {
 
         let match = try #require(matches.only)
         #expect(match.id == "401879246")
-        #expect(match.leagueSlug == "eng.1")
+        #expect(match.competitionSlug == "eng.1")
         #expect(match.home == Team(id: "364", name: "Liverpool", abbreviation: "LIV",
                                    logoURL: URL(string: "https://a.espncdn.com/i/teamlogos/soccer/500/364.png")))
         #expect(match.away == Team(id: "359", name: "Arsenal", abbreviation: "ARS",
@@ -249,19 +249,19 @@ struct ESPNProviderTests {
     }
 }
 
-private let premierLeague = League(slug: "eng.1", displayName: "Premier League")
-private let faCupQualifying = League(slug: "eng.fa_qual", displayName: "FA Cup Qualifying")
-private let peruLiga1 = League(slug: "per.1", displayName: "Liga 1 (Peru)")
-private let championsLeague = League(slug: "uefa.champions", displayName: "Champions League")
-private let nationalLeague = League(slug: "eng.5", displayName: "National League")
-private let carabaoCup = League(slug: "eng.league_cup", displayName: "Carabao Cup")
-private let coppaItalia = League(slug: "ita.coppa_italia", displayName: "Coppa Italia")
+private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League")
+private let faCupQualifying = Competition(slug: "eng.fa_qual", displayName: "FA Cup Qualifying")
+private let peruLiga1 = Competition(slug: "per.1", displayName: "Liga 1 (Peru)")
+private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League")
+private let nationalLeague = Competition(slug: "eng.5", displayName: "National League")
+private let carabaoCup = Competition(slug: "eng.league_cup", displayName: "Carabao Cup")
+private let coppaItalia = Competition(slug: "ita.coppa_italia", displayName: "Coppa Italia")
 /// Test-only slug serving fixtures edited from real responses.
-private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")
+private let editedStatus = Competition(slug: "test.edited-status", displayName: "Edited status (test only)")
 /// Test-only slug serving a real response with one placeholder team replaced.
-private let editedTeams = League(slug: "test.edited-teams", displayName: "Edited teams (test only)")
+private let editedTeams = Competition(slug: "test.edited-teams", displayName: "Edited teams (test only)")
 /// Test-only slug serving a real response with its `timeValid` flag removed.
-private let editedKickoff = League(slug: "test.edited-kickoff", displayName: "Edited kickoff (test only)")
+private let editedKickoff = Competition(slug: "test.edited-kickoff", displayName: "Edited kickoff (test only)")
 
 fileprivate extension Array {
     /// The single element, or `nil` when there are zero or several.

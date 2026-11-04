@@ -11,7 +11,7 @@ struct ESPNProvider: MatchDataProvider {
         self.session = session
     }
 
-    /// Scoreboard URL for a league on a specific day. The `dates=` query is the
+    /// Scoreboard URL for a Competition on a specific day. The `dates=` query is the
     /// one place the day→endpoint mapping lives: it maps the day to the single
     /// `YYYYMMDD` of its local calendar date, so the query matches the date the
     /// user sees in the header. A future fix for late-night kickoffs that ESPN
@@ -32,22 +32,22 @@ struct ESPNProvider: MatchDataProvider {
         return f.string(from: day)
     }
 
-    func matches(for leagues: [League], on day: Date) async throws -> [Match] {
-        // One scoreboard call per league, fetched concurrently and merged.
+    func matches(for competitions: [Competition], on day: Date) async throws -> [Match] {
+        // One scoreboard call per Competition, fetched concurrently and merged.
         try await withThrowingTaskGroup(of: [Match].self) { group in
-            for league in leagues {
-                group.addTask { try await self.matches(for: league, on: day) }
+            for competition in competitions {
+                group.addTask { try await self.matches(for: competition, on: day) }
             }
             var all: [Match] = []
-            for try await leagueMatches in group {
-                all.append(contentsOf: leagueMatches)
+            for try await competitionMatches in group {
+                all.append(contentsOf: competitionMatches)
             }
             return all
         }
     }
 
-    private func matches(for league: League, on day: Date) async throws -> [Match] {
-        let request = URLRequest(url: scoreboardURL(slug: league.slug, day: day))
+    private func matches(for competition: Competition, on day: Date) async throws -> [Match] {
+        let request = URLRequest(url: scoreboardURL(slug: competition.slug, day: day))
         let data: Data
         let response: URLResponse
         do {
@@ -66,7 +66,7 @@ struct ESPNProvider: MatchDataProvider {
             throw MatchDataError.decoding(underlying: error)
         }
 
-        return payload.events.compactMap { $0.toMatch(leagueSlug: league.slug) }
+        return payload.events.compactMap { $0.toMatch(competitionSlug: competition.slug) }
     }
 }
 
@@ -80,7 +80,9 @@ private struct Event: Decodable {
     let id: String
     let date: String
     let status: Status
-    let competitions: [Competition]
+    /// ESPN's `competitions` key: the contest(s) behind this event, not a
+    /// Competition in the glossary sense. The first one is the Match.
+    let competitions: [Contest]
 
     struct Status: Decodable {
         let type: StatusType
@@ -97,7 +99,7 @@ private struct Event: Decodable {
         }
     }
 
-    struct Competition: Decodable {
+    struct Contest: Decodable {
         /// Whether the kickoff time is confirmed. `false` on Cup Matches
         /// with a nominal time (shortDetail `TBD`). Optional so an absent
         /// flag never fails decoding; absent counts as confirmed.
@@ -137,7 +139,7 @@ private struct Event: Decodable {
     /// Maps an ESPN team to the app's `Team`. A placeholder team keeps its id
     /// but is named and abbreviated plain "TBD", with no logo, instead of the
     /// Primary Source's `TBD Home` / `TBD Away`.
-    private static func team(from dto: Competition.Competitor.TeamDTO) -> Team {
+    private static func team(from dto: Contest.Competitor.TeamDTO) -> Team {
         if placeholderTeamIDs.contains(dto.id) {
             return Team(id: dto.id, name: Match.toBeDecidedLabel,
                         abbreviation: Match.toBeDecidedLabel, logoURL: nil)
@@ -152,11 +154,11 @@ private struct Event: Decodable {
     /// competitors we require or both of its teams are placeholders. A Match
     /// with one placeholder team is kept, so a team's next Cup Match shows
     /// before its opponent is known.
-    func toMatch(leagueSlug: String) -> Match? {
-        guard let competition = competitions.first else { return nil }
+    func toMatch(competitionSlug: String) -> Match? {
+        guard let contest = competitions.first else { return nil }
         guard
-            let homeC = competition.competitors.first(where: { $0.homeAway == "home" }),
-            let awayC = competition.competitors.first(where: { $0.homeAway == "away" })
+            let homeC = contest.competitors.first(where: { $0.homeAway == "home" }),
+            let awayC = contest.competitors.first(where: { $0.homeAway == "away" })
         else { return nil }
         if Self.placeholderTeamIDs.contains(homeC.team.id),
            Self.placeholderTeamIDs.contains(awayC.team.id) {
@@ -177,7 +179,7 @@ private struct Event: Decodable {
 
         return Match(
             id: id,
-            leagueSlug: leagueSlug,
+            competitionSlug: competitionSlug,
             home: home,
             away: away,
             score: score,
@@ -187,7 +189,7 @@ private struct Event: Decodable {
                               completed: status.type.completed),
             statusDetail: status.type.shortDetail ?? status.type.detail ?? "",
             kickoff: Self.parseDate(date) ?? .distantFuture,
-            isKickoffConfirmed: competition.timeValid ?? true
+            isKickoffConfirmed: contest.timeValid ?? true
         )
     }
 
