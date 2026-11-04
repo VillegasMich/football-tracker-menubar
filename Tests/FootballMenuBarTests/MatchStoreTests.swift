@@ -326,6 +326,26 @@ final class MatchStoreTests {
         #expect(store.matches == [parisBayern])
     }
 
+    // MARK: - Pinned Match outside the Followed Competitions
+
+    @Test("An unfollowed Pinned Match's Competition is still requested for the ticker, while its Matches stay out of the list")
+    func unfollowedPinnedCompetitionStillRequested() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedMatchID == arsenalChelsea.id)
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+        #expect(store.matches == [parisBayern])
+        #expect(store.matchesByCompetition.map(\.competition) == [championsLeague])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -362,6 +382,10 @@ private var todayKickoff: Date {
 private var arsenalChelsea: Match {
     makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
               statusDetail: "8:00 PM", kickoff: todayKickoff)
+}
+private var arsenalChelseaLive: Match {
+    makeMatch(id: "1", competitionSlug: "eng.1", state: .inProgress,
+              statusDetail: "30'", score: Score(home: 1, away: 0), kickoff: todayKickoff)
 }
 private var yesterdayArsenalChelsea: Match {
     makeMatch(id: "3", competitionSlug: "eng.1", state: .finished,

@@ -62,6 +62,10 @@ final class MatchStore: ObservableObject {
     /// The pinned match's day, used to fetch its ticker feed. `nil` for a legacy
     /// pin with no persisted day (treated as today at restore time).
     private var pinnedMatchDay: Date?
+    /// The slug of the Pinned Match's Competition, so the ticker can fetch it
+    /// while it isn't followed. `nil` for a pin saved before the Competition
+    /// was stored: such a pin is looked up among the Followed Competitions.
+    private var pinnedCompetitionSlug: String?
 
     /// The Followed Competitions, in catalogue order: what is requested and
     /// listed.
@@ -140,6 +144,7 @@ final class MatchStore: ObservableObject {
     func pin(_ match: Match) {
         pinnedMatchID = match.id
         pinnedMatchDay = Calendar.current.startOfDay(for: match.kickoff)
+        pinnedCompetitionSlug = match.competitionSlug
         setPinnedSnapshot(match, source: .seed)
         persistPin()
     }
@@ -148,6 +153,7 @@ final class MatchStore: ObservableObject {
     func unpin() {
         pinnedMatchID = nil
         pinnedMatchDay = nil
+        pinnedCompetitionSlug = nil
         setPinnedSnapshot(nil, source: .seed)
         persistPin()
     }
@@ -180,6 +186,22 @@ final class MatchStore: ObservableObject {
     /// for a legacy pin without a persisted day.
     private var pinnedDay: Date {
         pinnedMatchDay ?? Calendar.current.startOfDay(for: Date())
+    }
+
+    /// The Pinned Match's Competition while it isn't followed and its day isn't
+    /// over: the ticker fetches it on top of the Followed Competitions. Its
+    /// Matches never reach the list.
+    private var unfollowedPinnedCompetition: Competition? {
+        guard pinnedMatchID != nil, let slug = pinnedCompetitionSlug,
+              !followedCompetitions.contains(where: { $0.slug == slug })
+        else { return nil }
+        return Competition.inCatalogue(slugs: [slug]).first
+    }
+
+    /// The Competitions the ticker fetch requests: the Followed Competitions,
+    /// plus the Pinned Match's own while it isn't followed.
+    private var tickerCompetitions: [Competition] {
+        followedCompetitions + (unfollowedPinnedCompetition.map { [$0] } ?? [])
     }
 
     /// True when the browsed day is the pinned match's day, so a single fetch
@@ -377,7 +399,7 @@ final class MatchStore: ObservableObject {
     /// seed from a live poll tick for notification purposes.
     private func refreshTicker(source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
-        let results = await provider.matches(for: followedCompetitions, on: pinnedDay)
+        let results = await provider.matches(for: tickerCompetitions, on: pinnedDay)
         updateSnapshot(from: results, id: id, source: source)
     }
 
