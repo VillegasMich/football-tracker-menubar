@@ -44,6 +44,7 @@ responses from the Primary Source are saved real JSON files under
 | `test.sh` | Runs the test suite (see Tests) |
 | `Sources/FootballMenuBar/MenuBarTitle.swift` | Pure builder for the Pinned Match's menu bar title |
 | `Sources/FootballMenuBar/MatchRowPresentation.swift` | Pure presentation of a single Match row |
+| `Sources/FootballMenuBar/CompetitionFailureNote.swift` | Pure wording of the note under a Competition that failed to update |
 | `Tests/FootballMenuBarTests/` | Swift Testing suite and saved Primary Source responses |
 | `Sources/FootballMenuBar/FootballMenuBarApp.swift` | `@main` entry + `AppDelegate` (hides Dock icon) |
 | `Sources/FootballMenuBar/MenuContent.swift` | Menu bar dropdown contents |
