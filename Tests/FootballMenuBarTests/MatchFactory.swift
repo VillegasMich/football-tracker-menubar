@@ -13,7 +13,7 @@ func makeMatch(state: MatchState,
                home: Team = Team(id: "359", name: "Arsenal", abbreviation: "ARS", logoURL: nil),
                away: Team = Team(id: "363", name: "Chelsea", abbreviation: "CHE", logoURL: nil)) -> Match {
     Match(id: "740001",
-          leagueSlug: "eng.1",
+          competitionSlug: "eng.1",
           home: home,
           away: away,
           score: score,

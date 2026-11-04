@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Observable store that keeps matches current for the selected leagues and
+/// Observable store that keeps matches current for the selected Competitions and
 /// auto-refreshes on a cadence driven by live play. Injected into the SwiftUI
 /// environment for views to read.
 ///
@@ -49,7 +49,7 @@ final class MatchStore: ObservableObject {
     /// pin with no persisted day (treated as today at restore time).
     private var pinnedMatchDay: Date?
 
-    let leagues: [League]
+    let competitions: [Competition]
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
     /// User configuration; the poll loop reads the cadence from it each tick.
@@ -64,12 +64,12 @@ final class MatchStore: ObservableObject {
     private enum SnapshotSource { case seed, poll }
 
     init(provider: MatchDataProvider,
-         leagues: [League] = League.supported,
+         competitions: [Competition] = Competition.supported,
          defaults: UserDefaults = .standard,
          settings: AppSettings = AppSettings(),
          notifier: MatchNotifier? = nil) {
         self.provider = provider
-        self.leagues = leagues
+        self.competitions = competitions
         self.defaults = defaults
         self.settings = settings
         self.notifier = notifier
@@ -149,14 +149,14 @@ final class MatchStore: ObservableObject {
     /// rather than flashing empty the moment `selectedDate` changes.
     var visibleMatches: [Match] { matches }
 
-    /// Matches grouped by league in the supported-league order, for display.
-    var matchesByLeague: [(league: League, matches: [Match])] {
+    /// Matches grouped by Competition in the supported-Competition order, for display.
+    var matchesByCompetition: [(competition: Competition, matches: [Match])] {
         let visible = visibleMatches
-        return leagues.compactMap { league in
+        return competitions.compactMap { competition in
             let group = visible
-                .filter { $0.leagueSlug == league.slug }
+                .filter { $0.competitionSlug == competition.slug }
                 .sorted(by: Self.displayOrder)
-            return group.isEmpty ? nil : (league, group)
+            return group.isEmpty ? nil : (competition, group)
         }
     }
 
@@ -264,7 +264,7 @@ final class MatchStore: ObservableObject {
     /// day changed while the fetch was in flight (out-of-order guard).
     private func loadBrowse(for target: Date) async {
         do {
-            let fetched = try await provider.matches(for: leagues, on: target)
+            let fetched = try await provider.matches(for: competitions, on: target)
             guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
             matches = fetched
             errorMessage = nil
@@ -292,7 +292,7 @@ final class MatchStore: ObservableObject {
     private func refreshTicker(source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
         do {
-            let fetched = try await provider.matches(for: leagues, on: pinnedDay)
+            let fetched = try await provider.matches(for: competitions, on: pinnedDay)
             setPinnedSnapshot(fetched.first { $0.id == id }, source: source)
         } catch {
             // Keep the last-known snapshot on a transient failure.

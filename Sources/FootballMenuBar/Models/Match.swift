@@ -4,8 +4,8 @@ import Foundation
 /// status detail (kickoff time, live minute, or final result) and kickoff date.
 struct Match: Codable, Identifiable, Hashable, Sendable {
     let id: String
-    /// ESPN slug of the league this match belongs to (e.g. `fifa.world`).
-    let leagueSlug: String
+    /// ESPN slug of the Competition this match belongs to (e.g. `fifa.world`).
+    let competitionSlug: String
     let home: Team
     let away: Team
     /// Goals scored in play, extra time included. Never changed by Penalty

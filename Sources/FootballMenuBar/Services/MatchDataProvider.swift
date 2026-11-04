@@ -4,10 +4,10 @@ import Foundation
 /// concrete source, so ESPN can be swapped or given a fallback (e.g.
 /// football-data.org) without touching the store or views.
 protocol MatchDataProvider: Sendable {
-    /// Returns the matches for the given leagues on the given day. Implementations
+    /// Returns the matches for the given Competitions on the given day. Implementations
     /// should fetch concurrently where possible and throw rather than crash on
     /// failure.
-    func matches(for leagues: [League], on day: Date) async throws -> [Match]
+    func matches(for competitions: [Competition], on day: Date) async throws -> [Match]
 }
 
 /// Errors surfaced by a provider so callers can contain the failure.
