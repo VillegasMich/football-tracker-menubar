@@ -20,7 +20,12 @@ final class AppSettings: ObservableObject {
         static let notificationsEnabled = "settings.notificationsEnabled"
         static let notifyOnKickoff = "settings.notifyOnKickoff"
         static let notifyOnGoal = "settings.notifyOnGoal"
+        static let followedCompetitions = "settings.followedCompetitions"
     }
+
+    /// The Competitions the user follows, in catalogue order. Persisted as
+    /// their slugs.
+    @Published private(set) var followedCompetitions: [Competition]
 
     /// Selected refresh cadence preset. Persisted by raw string; an unknown
     /// persisted value falls back to the default.
@@ -100,6 +105,9 @@ final class AppSettings: ObservableObject {
         // is ignored rather than crashing.
         let raw = defaults.dictionary(forKey: Key.abbreviationOverrides) ?? [:]
         self.abbreviationOverrides = raw.compactMapValues { $0 as? String }
+        let followedSlugs = Set(defaults.stringArray(forKey: Key.followedCompetitions) ?? [])
+        let followed = Competition.catalogue.filter { followedSlugs.contains($0.slug) }
+        self.followedCompetitions = followed.isEmpty ? Competition.defaultFollowed : followed
     }
 
     // MARK: - Abbreviation overrides

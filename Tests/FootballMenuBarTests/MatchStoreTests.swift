@@ -19,12 +19,27 @@ final class MatchStoreTests {
         UserDefaults().removePersistentDomain(forName: suiteName)
     }
 
+    /// A store following the Premier League and the Champions League.
     private func makeStore() -> MatchStore {
-        MatchStore(provider: provider,
-                   competitions: [premierLeague, championsLeague],
-                   defaults: defaults,
-                   settings: AppSettings(defaults: defaults),
-                   notifier: nil)
+        defaults.set([premierLeague.slug, championsLeague.slug], forKey: "settings.followedCompetitions")
+        return MatchStore(provider: provider,
+                          defaults: defaults,
+                          settings: AppSettings(defaults: defaults),
+                          notifier: nil)
+    }
+
+    // MARK: - Followed Competitions
+
+    @Test("On first launch the Followed Competitions are the three defaults, and only they are requested")
+    func firstLaunchFollowsDefaults() async {
+        let store = MatchStore(provider: provider, defaults: defaults,
+                               settings: AppSettings(defaults: defaults), notifier: nil)
+
+        await store.loadInitial()
+
+        #expect(store.settings.followedCompetitions.map(\.displayName)
+                == ["Premier League", "Champions League", "World Cup"])
+        #expect(provider.requestedSlugs == [["eng.1", "uefa.champions", "fifa.world"]])
     }
 
     // MARK: - A Competition that fails

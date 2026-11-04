@@ -63,7 +63,9 @@ final class MatchStore: ObservableObject {
     /// pin with no persisted day (treated as today at restore time).
     private var pinnedMatchDay: Date?
 
-    let competitions: [Competition]
+    /// The Followed Competitions, in catalogue order: what is requested and
+    /// listed.
+    @Published private(set) var competitions: [Competition]
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
     /// User configuration; the poll loop reads the cadence from it each tick.
@@ -78,12 +80,11 @@ final class MatchStore: ObservableObject {
     private enum SnapshotSource { case seed, poll }
 
     init(provider: MatchDataProvider,
-         competitions: [Competition] = Competition.defaultFollowed,
          defaults: UserDefaults = .standard,
          settings: AppSettings = AppSettings(),
          notifier: MatchNotifier? = nil) {
         self.provider = provider
-        self.competitions = competitions
+        self.competitions = settings.followedCompetitions
         self.defaults = defaults
         self.settings = settings
         self.notifier = notifier
