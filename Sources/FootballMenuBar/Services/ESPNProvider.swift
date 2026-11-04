@@ -80,7 +80,9 @@ private struct Event: Decodable {
     let id: String
     let date: String
     let status: Status
-    let competitions: [Competition]
+    /// ESPN's `competitions` key: the contest(s) behind this event, not a
+    /// Competition in the glossary sense. The first one is the Match.
+    let competitions: [Contest]
 
     struct Status: Decodable {
         let type: StatusType
@@ -97,7 +99,7 @@ private struct Event: Decodable {
         }
     }
 
-    struct Competition: Decodable {
+    struct Contest: Decodable {
         /// Whether the kickoff time is confirmed. `false` on Cup Matches
         /// with a nominal time (shortDetail `TBD`). Optional so an absent
         /// flag never fails decoding; absent counts as confirmed.
@@ -137,7 +139,7 @@ private struct Event: Decodable {
     /// Maps an ESPN team to the app's `Team`. A placeholder team keeps its id
     /// but is named and abbreviated plain "TBD", with no logo, instead of the
     /// Primary Source's `TBD Home` / `TBD Away`.
-    private static func team(from dto: Competition.Competitor.TeamDTO) -> Team {
+    private static func team(from dto: Contest.Competitor.TeamDTO) -> Team {
         if placeholderTeamIDs.contains(dto.id) {
             return Team(id: dto.id, name: Match.toBeDecidedLabel,
                         abbreviation: Match.toBeDecidedLabel, logoURL: nil)
@@ -153,10 +155,10 @@ private struct Event: Decodable {
     /// with one placeholder team is kept, so a team's next Cup Match shows
     /// before its opponent is known.
     func toMatch(competitionSlug: String) -> Match? {
-        guard let competition = competitions.first else { return nil }
+        guard let contest = competitions.first else { return nil }
         guard
-            let homeC = competition.competitors.first(where: { $0.homeAway == "home" }),
-            let awayC = competition.competitors.first(where: { $0.homeAway == "away" })
+            let homeC = contest.competitors.first(where: { $0.homeAway == "home" }),
+            let awayC = contest.competitors.first(where: { $0.homeAway == "away" })
         else { return nil }
         if Self.placeholderTeamIDs.contains(homeC.team.id),
            Self.placeholderTeamIDs.contains(awayC.team.id) {
@@ -187,7 +189,7 @@ private struct Event: Decodable {
                               completed: status.type.completed),
             statusDetail: status.type.shortDetail ?? status.type.detail ?? "",
             kickoff: Self.parseDate(date) ?? .distantFuture,
-            isKickoffConfirmed: competition.timeValid ?? true
+            isKickoffConfirmed: contest.timeValid ?? true
         )
     }
 

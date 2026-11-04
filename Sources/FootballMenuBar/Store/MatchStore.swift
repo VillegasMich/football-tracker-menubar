@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Observable store that keeps matches current for the selected Competitions and
+/// Observable store that keeps matches current for the supported Competitions and
 /// auto-refreshes on a cadence driven by live play. Injected into the SwiftUI
 /// environment for views to read.
 ///
