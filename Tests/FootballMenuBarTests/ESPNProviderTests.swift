@@ -9,7 +9,7 @@ struct ESPNProviderTests {
         // Premier League, 1 Nov 2026: Liverpool 0–1 Arsenal, full time.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [premierLeague], on: localDay(2026, 11, 1))
+        let matches = try await provider.matches(in: premierLeague, on: localDay(2026, 11, 1))
 
         let match = try #require(matches.only)
         #expect(match.id == "401879246")
@@ -30,7 +30,7 @@ struct ESPNProviderTests {
         // United, `STATUS_POSTPONED` with state `post` and `completed: false`.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 11))
+        let matches = try await provider.matches(in: faCupQualifying, on: localDay(2026, 8, 11))
 
         let match = try #require(matches.first { $0.id == "401906752" })
         #expect(match.state == .postponed)
@@ -42,7 +42,7 @@ struct ESPNProviderTests {
         // `STATUS_CANCELED` with state `post` and `completed: false`.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 8))
+        let matches = try await provider.matches(in: faCupQualifying, on: localDay(2026, 8, 8))
 
         let match = try #require(matches.only)
         #expect(match.id == "401890832")
@@ -56,7 +56,7 @@ struct ESPNProviderTests {
         // `completed: false`, shortDetail `ABN`).
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [peruLiga1], on: localDay(2025, 11, 8))
+        let matches = try await provider.matches(in: peruLiga1, on: localDay(2025, 11, 8))
 
         let match = try #require(matches.only)
         #expect(match.id == "760180")
@@ -71,7 +71,7 @@ struct ESPNProviderTests {
         // shortDetail `Susp`).
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [nationalLeague], on: localDay(2026, 12, 15))
+        let matches = try await provider.matches(in: nationalLeague, on: localDay(2026, 12, 15))
 
         let match = try #require(matches.only)
         #expect(match.id == "401889241")
@@ -87,7 +87,7 @@ struct ESPNProviderTests {
         // stays `STATUS_SUSPENDED`. No real resumed Match has been observed.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [editedStatus], on: localDay(2026, 12, 15))
+        let matches = try await provider.matches(in: editedStatus, on: localDay(2026, 12, 15))
 
         let match = try #require(matches.only)
         #expect(match.id == "401889241")
@@ -101,7 +101,7 @@ struct ESPNProviderTests {
         // 3–1 after extra time (`STATUS_FINAL_AET`, `completed: true`).
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 11))
+        let matches = try await provider.matches(in: faCupQualifying, on: localDay(2026, 8, 11))
 
         let match = try #require(matches.first { $0.id == "401906755" })
         #expect(match.state == .finished)
@@ -116,7 +116,7 @@ struct ESPNProviderTests {
         // (`STATUS_FINAL_PEN`, shortDetail `FT-Pens`, `shootoutScore` 4 and 3).
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [championsLeague], on: localDay(2026, 5, 30))
+        let matches = try await provider.matches(in: championsLeague, on: localDay(2026, 5, 30))
 
         let match = try #require(matches.only)
         #expect(match.id == "401862897")
@@ -134,7 +134,7 @@ struct ESPNProviderTests {
         // 3–1 after extra time, no `shootoutScore` on either competitor.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 11))
+        let matches = try await provider.matches(in: faCupQualifying, on: localDay(2026, 8, 11))
 
         let match = try #require(matches.first { $0.id == "401906755" })
         #expect(match.penaltyShootout == nil)
@@ -148,7 +148,7 @@ struct ESPNProviderTests {
         // and shortDetail `TBD`.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [carabaoCup], on: localDay(2026, 12, 15))
+        let matches = try await provider.matches(in: carabaoCup, on: localDay(2026, 12, 15))
 
         #expect(Set(matches.map(\.id)) == ["401932163", "401932186", "401932187", "401932185"])
         for match in matches {
@@ -168,7 +168,7 @@ struct ESPNProviderTests {
         // below for that.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [coppaItalia], on: localDay(2027, 2, 3))
+        let matches = try await provider.matches(in: coppaItalia, on: localDay(2027, 2, 3))
 
         #expect(matches.isEmpty)
     }
@@ -182,7 +182,7 @@ struct ESPNProviderTests {
         // No real one-placeholder Match has been observed.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [editedTeams], on: localDay(2027, 2, 3))
+        let matches = try await provider.matches(in: editedTeams, on: localDay(2027, 2, 3))
 
         let match = try #require(matches.only)
         #expect(match.id == "401912254")
@@ -198,7 +198,7 @@ struct ESPNProviderTests {
         // empty logo).
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [editedTeams], on: localDay(2027, 2, 3))
+        let matches = try await provider.matches(in: editedTeams, on: localDay(2027, 2, 3))
 
         let match = try #require(matches.only)
         #expect(match.away == Team(id: "131554", name: "TBD", abbreviation: "TBD", logoURL: nil))
@@ -211,7 +211,7 @@ struct ESPNProviderTests {
         // Premier League, 1 Nov 2026: Liverpool 0–1 Arsenal, `timeValid: true`.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [premierLeague], on: localDay(2026, 11, 1))
+        let matches = try await provider.matches(in: premierLeague, on: localDay(2026, 11, 1))
 
         let match = try #require(matches.only)
         #expect(match.isKickoffConfirmed)
@@ -225,7 +225,7 @@ struct ESPNProviderTests {
         // far carries the flag.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [editedKickoff], on: localDay(2026, 11, 1))
+        let matches = try await provider.matches(in: editedKickoff, on: localDay(2026, 11, 1))
 
         let match = try #require(matches.only)
         #expect(match.id == "401879246")
@@ -241,11 +241,30 @@ struct ESPNProviderTests {
         // `completed` stays false. No real unknown name has been observed.
         let provider = ESPNProvider(session: .espnFixtures)
 
-        let matches = try await provider.matches(for: [editedStatus], on: localDay(2026, 8, 11))
+        let matches = try await provider.matches(in: editedStatus, on: localDay(2026, 8, 11))
 
         let match = try #require(matches.only)
         #expect(match.id == "401906752")
         #expect(match.state == .upcoming)
+    }
+
+    @Test("In one call, a Competition that loads succeeds while one that fails is reported as failed")
+    func perCompetitionOutcome() async throws {
+        // Premier League has a saved response for 1 Nov 2026; the Champions
+        // League has none, so the stub answers it with HTTP 404.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let results = await provider.matches(for: [premierLeague, championsLeague],
+                                              on: localDay(2026, 11, 1))
+
+        #expect(results.count == 2)
+        let premierLeagueMatches = try #require(try results[premierLeague.slug]?.get())
+        #expect(premierLeagueMatches.map(\.id) == ["401879246"])
+        let championsLeagueResult = try #require(results[championsLeague.slug])
+        guard case .failure(.badResponse(status: 404)) = championsLeagueResult else {
+            Issue.record("Expected a 404 failure, got \(championsLeagueResult)")
+            return
+        }
     }
 }
 

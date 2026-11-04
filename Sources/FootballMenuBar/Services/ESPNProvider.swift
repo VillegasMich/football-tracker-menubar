@@ -32,21 +32,28 @@ struct ESPNProvider: MatchDataProvider {
         return f.string(from: day)
     }
 
-    func matches(for competitions: [Competition], on day: Date) async throws -> [Match] {
-        // One scoreboard call per Competition, fetched concurrently and merged.
-        try await withThrowingTaskGroup(of: [Match].self) { group in
+    func matches(for competitions: [Competition], on day: Date) async -> CompetitionResults {
+        // One scoreboard call per Competition, fetched concurrently. Each
+        // Competition's failure is kept apart, so it never fails the others.
+        await withTaskGroup(of: (String, Result<[Match], MatchDataError>).self) { group in
             for competition in competitions {
-                group.addTask { try await self.matches(for: competition, on: day) }
+                group.addTask {
+                    do throws(MatchDataError) {
+                        return (competition.slug, .success(try await self.matches(for: competition, on: day)))
+                    } catch {
+                        return (competition.slug, .failure(error))
+                    }
+                }
             }
-            var all: [Match] = []
-            for try await competitionMatches in group {
-                all.append(contentsOf: competitionMatches)
+            var results: CompetitionResults = [:]
+            for await (slug, result) in group {
+                results[slug] = result
             }
-            return all
+            return results
         }
     }
 
-    private func matches(for competition: Competition, on day: Date) async throws -> [Match] {
+    private func matches(for competition: Competition, on day: Date) async throws(MatchDataError) -> [Match] {
         let request = URLRequest(url: scoreboardURL(slug: competition.slug, day: day))
         let data: Data
         let response: URLResponse

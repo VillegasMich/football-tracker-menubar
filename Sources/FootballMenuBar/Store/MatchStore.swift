@@ -264,7 +264,7 @@ final class MatchStore: ObservableObject {
     /// day changed while the fetch was in flight (out-of-order guard).
     private func loadBrowse(for target: Date) async {
         do {
-            let fetched = try await provider.matches(for: competitions, on: target)
+            let fetched = try await provider.matches(for: competitions, on: target).values.flatMap { try $0.get() }
             guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
             matches = fetched
             errorMessage = nil
@@ -292,7 +292,7 @@ final class MatchStore: ObservableObject {
     private func refreshTicker(source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
         do {
-            let fetched = try await provider.matches(for: competitions, on: pinnedDay)
+            let fetched = try await provider.matches(for: competitions, on: pinnedDay).values.flatMap { try $0.get() }
             setPinnedSnapshot(fetched.first { $0.id == id }, source: source)
         } catch {
             // Keep the last-known snapshot on a transient failure.
