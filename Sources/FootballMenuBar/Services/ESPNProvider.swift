@@ -128,9 +128,10 @@ private struct Event: Decodable {
 
     /// The Primary Source's placeholder teams for a Cup round whose teams
     /// aren't decided yet: `TBD Home` (131556) and `TBD Away` (131554). Seen
-    /// on every placeholder event, with the same ids across rounds. Matched
-    /// by id rather than name: ids are the Primary Source's stable identity
-    /// for a team, while names are display text.
+    /// with these ids on all nine placeholder Matches of the 2026–27 Coppa
+    /// Italia, from the quarter-finals to the final. Matched by id rather
+    /// than name: ids are the Primary Source's stable identity for a team,
+    /// while names are display text. The responses carry no placeholder flag.
     private static let placeholderTeamIDs: Set<String> = ["131556", "131554"]
 
     /// Maps an ESPN event to the app's `Match`, or nil if it lacks the two

@@ -39,9 +39,9 @@ enum MenuBarTitle {
     }
 
     /// The state-dependent middle segment shared by the text title and the
-    /// logo-mode title: the score while in-progress, finished or abandoned, the
-    /// kickoff time while upcoming ("TBD" while that time is unconfirmed), and
-    /// the status word when postponed or cancelled.
+    /// logo-mode title: the score while Live, Finished or Abandoned, the
+    /// kickoff time while Upcoming ("TBD" while that time is unconfirmed), and
+    /// the status word when Postponed or Cancelled.
     static func middle(for match: Match,
                        locale: Locale = .autoupdatingCurrent,
                        timeZone: TimeZone = .autoupdatingCurrent) -> String {

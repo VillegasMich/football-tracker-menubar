@@ -176,9 +176,9 @@ struct ESPNProviderTests {
     @Test("A Match with one placeholder team is kept, while both-placeholder Matches in the same response are dropped")
     func onePlaceholderTeamKept() async throws {
         // EDITED fixture, not a verbatim response: the real Coppa Italia
-        // response above (3 Feb 2027) with only event 401912254's home
+        // response above (3 Feb 2027) with only Match 401912254's home
         // competitor (`TBD Home`) replaced by AS Roma's, copied from the real
-        // Coppa Italia event 401912496. The other three events are unchanged.
+        // Coppa Italia Match 401912496. The other three Matches are unchanged.
         // No real one-placeholder Match has been observed.
         let provider = ESPNProvider(session: .espnFixtures)
 
@@ -241,9 +241,9 @@ private let peruLiga1 = League(slug: "per.1", displayName: "Liga 1 (Peru)")
 private let championsLeague = League(slug: "uefa.champions", displayName: "Champions League")
 private let nationalLeague = League(slug: "eng.5", displayName: "National League")
 private let carabaoCup = League(slug: "eng.league_cup", displayName: "Carabao Cup")
+private let coppaItalia = League(slug: "ita.coppa_italia", displayName: "Coppa Italia")
 /// Test-only slug serving fixtures edited from real responses.
 private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")
-private let coppaItalia = League(slug: "ita.coppa_italia", displayName: "Coppa Italia")
 /// Test-only slug serving a real response with one placeholder team replaced.
 private let editedTeams = League(slug: "test.edited-teams", displayName: "Edited teams (test only)")
 /// Test-only slug serving a real response with its `timeValid` flag removed.
