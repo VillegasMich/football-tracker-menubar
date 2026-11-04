@@ -19,6 +19,7 @@ final class MatchStore: ObservableObject {
     /// `UserDefaults` keys under which the pin is persisted.
     private static let pinnedMatchIDKey = "pinnedMatchID"
     private static let pinnedMatchDayKey = "pinnedMatchDay"
+    private static let pinnedCompetitionSlugKey = "pinnedMatchCompetitionSlug"
 
     /// Persists the pinned match's day as `yyyy-MM-dd` (local) so the ticker can
     /// be restored by re-fetching that day on launch.
@@ -103,6 +104,7 @@ final class MatchStore: ObservableObject {
         if let dayString = defaults.string(forKey: Self.pinnedMatchDayKey) {
             self.pinnedMatchDay = Self.dayKeyFormatter.date(from: dayString)
         }
+        self.pinnedCompetitionSlug = defaults.string(forKey: Self.pinnedCompetitionSlugKey)
         // `@Published` emits before the property changes, so the new value is
         // taken from the emission. Settings change on the main actor.
         followedCompetitionsSubscription = settings.$followedCompetitions
@@ -169,9 +171,13 @@ final class MatchStore: ObservableObject {
             if let day = pinnedMatchDay {
                 defaults.set(Self.dayKeyFormatter.string(from: day), forKey: Self.pinnedMatchDayKey)
             }
+            if let slug = pinnedCompetitionSlug {
+                defaults.set(slug, forKey: Self.pinnedCompetitionSlugKey)
+            }
         } else {
             defaults.removeObject(forKey: Self.pinnedMatchIDKey)
             defaults.removeObject(forKey: Self.pinnedMatchDayKey)
+            defaults.removeObject(forKey: Self.pinnedCompetitionSlugKey)
         }
     }
 

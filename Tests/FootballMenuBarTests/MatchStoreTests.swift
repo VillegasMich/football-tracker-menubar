@@ -346,6 +346,23 @@ final class MatchStoreTests {
         #expect(store.matchesByCompetition.map(\.competition) == [championsLeague])
     }
 
+    @Test("The Pinned Match's Competition is saved with the pin, so a new store still requests it while it isn't followed")
+    func pinnedCompetitionPersists() async {
+        let first = makeStore()
+        first.pin(arsenalChelsea)
+        first.settings.unfollow(premierLeague)
+        await first.followedCompetitionsRefresh?.value
+
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+        #expect(store.matches == [parisBayern])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
