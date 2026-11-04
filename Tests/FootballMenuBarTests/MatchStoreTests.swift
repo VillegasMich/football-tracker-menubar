@@ -413,6 +413,22 @@ final class MatchStoreTests {
         #expect(relaunched.pinnedSnapshot == arsenalChelseaLive)
     }
 
+    @Test("A refresh tick while browsing the pinned day still fetches the unfollowed Pinned Match's Competition, alone, for the ticker")
+    func tickOnPinnedDayFetchesUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.tick()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+        #expect(store.matchesByCompetition.map(\.competition) == [championsLeague])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")

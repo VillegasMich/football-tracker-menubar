@@ -308,11 +308,18 @@ final class MatchStore: ObservableObject {
     /// scheduled match flip to live on its own — a day of purely upcoming
     /// matches would otherwise never re-fetch and so never observe kickoff. When
     /// the browsed day is the pinned day, the browse fetch also updates the
-    /// snapshot, so the separate ticker fetch is skipped.
-    private func tick() async {
+    /// snapshot from the Followed Competitions, so the ticker fetch requests
+    /// only the Pinned Match's unfollowed Competition, if any.
+    ///
+    /// One refresh tick of the polling loop; internal, not private, for tests.
+    func tick() async {
         let browseWillRefresh = isViewingToday || hasLiveMatch
-        if !(browseWillRefresh && pinnedDayIsBrowsed) {
-            await refreshTicker(source: .poll)
+        if browseWillRefresh && pinnedDayIsBrowsed {
+            if let unfollowed = unfollowedPinnedCompetition {
+                await refreshTicker(requesting: [unfollowed], source: .poll)
+            }
+        } else {
+            await refreshTicker(requesting: tickerCompetitions, source: .poll)
         }
         if browseWillRefresh {
             await refresh()
@@ -398,15 +405,15 @@ final class MatchStore: ObservableObject {
     /// This is a seed, not live observation, so it must never notify.
     private func restorePinnedSnapshot() async {
         guard pinnedMatchID != nil else { return }
-        await refreshTicker(source: .seed)
+        await refreshTicker(requesting: tickerCompetitions, source: .seed)
     }
 
-    /// Fetch the pinned match's day and update its snapshot (see
-    /// `updateSnapshot(from:id:source:)`). `source` distinguishes the launch
-    /// seed from a live poll tick for notification purposes.
-    private func refreshTicker(source: SnapshotSource) async {
+    /// Fetch `competitions` on the pinned match's day and update its snapshot
+    /// (see `updateSnapshot(from:id:source:)`). `source` distinguishes the
+    /// launch seed from a live poll tick for notification purposes.
+    private func refreshTicker(requesting competitions: [Competition], source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
-        let results = await provider.matches(for: tickerCompetitions, on: pinnedDay)
+        let results = await provider.matches(for: competitions, on: pinnedDay)
         updateSnapshot(from: results, id: id, source: source)
     }
 
