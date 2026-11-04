@@ -51,7 +51,7 @@ struct MatchRowPresentation {
             } else {
                 badgeText = match.statusDetail
             }
-        case .inProgress, .finished:
+        case .inProgress, .finished, .abandoned:
             score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
             badgeText = match.statusDetail
         case .postponed, .cancelled:

@@ -10,6 +10,9 @@ enum MatchState: String, Codable, Sendable {
     case postponed
     /// Will not be played at all.
     case cancelled
+    /// Kicked off but was stopped and not completed. Keeps the score from
+    /// when play stopped.
+    case abandoned
 
     /// The word shown in place of a score for a Match that was never played:
     /// "Postponed" or "Cancelled" (the Primary Source spells it "Canceled").
@@ -18,7 +21,7 @@ enum MatchState: String, Codable, Sendable {
         switch self {
         case .postponed: return "Postponed"
         case .cancelled: return "Cancelled"
-        case .upcoming, .inProgress, .finished: return nil
+        case .upcoming, .inProgress, .finished, .abandoned: return nil
         }
     }
 
@@ -26,8 +29,13 @@ enum MatchState: String, Codable, Sendable {
     /// lives:
     /// - `STATUS_POSTPONED` → Postponed; `STATUS_CANCELED` → Cancelled. Both
     ///   arrive with state `post` and `completed: false`.
+    /// - state `in` → Live, whatever the name, so a suspended Match that
+    ///   resumes is Live again.
+    /// - `STATUS_ABANDONED` or `STATUS_SUSPENDED` in state `post` → Abandoned.
+    ///   Both arrive with `completed: false` and the score from when play
+    ///   stopped. A suspended Match the Primary Source has stopped, and not
+    ///   yet resumed, counts as Abandoned.
     /// - state `post` → Finished only with `completed: true`.
-    /// - state `in` → Live.
     /// - anything else, including an unknown name in state `post`, →
     ///   Upcoming, so a shape change never crashes the app or drops a Match.
     init(espnName: String?, state: String, completed: Bool?) {
@@ -35,6 +43,7 @@ enum MatchState: String, Codable, Sendable {
         case ("STATUS_POSTPONED", _, _): self = .postponed
         case ("STATUS_CANCELED", _, _): self = .cancelled
         case (_, "in", _): self = .inProgress
+        case ("STATUS_ABANDONED", "post", _), ("STATUS_SUSPENDED", "post", _): self = .abandoned
         case (_, "post", true?): self = .finished
         default: self = .upcoming
         }
