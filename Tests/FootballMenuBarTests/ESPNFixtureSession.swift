@@ -12,6 +12,44 @@ extension URLSession {
         configuration.protocolClasses = [ESPNFixtureURLProtocol.self]
         return URLSession(configuration: configuration)
     }
+
+    /// Like `espnFixtures`, and also records the URL of every request it
+    /// receives into `log`.
+    static func espnFixtures(recordingInto log: RequestLog) -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ESPNFixtureURLProtocol.self]
+        configuration.httpAdditionalHeaders = [RequestLog.headerName: log.id]
+        RequestLog.register(log)
+        return URLSession(configuration: configuration)
+    }
+}
+
+/// The URLs of the requests a stub session received, in arrival order. Safe
+/// to share across the session's threads.
+final class RequestLog: @unchecked Sendable {
+    /// Header the stub session stamps on its requests so the stub protocol,
+    /// which the system creates, can find the log to record into.
+    fileprivate static let headerName = "X-Test-Request-Log"
+
+    fileprivate let id = UUID().uuidString
+    private let lock = NSLock()
+    private var recorded: [URL] = []
+
+    var urls: [URL] { lock.withLock { recorded } }
+
+    fileprivate func record(_ url: URL) { lock.withLock { recorded.append(url) } }
+
+    private static let registryLock = NSLock()
+    nonisolated(unsafe) private static var registry: [String: RequestLog] = [:]
+
+    fileprivate static func register(_ log: RequestLog) {
+        registryLock.withLock { registry[log.id] = log }
+    }
+
+    fileprivate static func log(for request: URLRequest) -> RequestLog? {
+        guard let id = request.value(forHTTPHeaderField: headerName) else { return nil }
+        return registryLock.withLock { registry[id] }
+    }
 }
 
 /// The local calendar day `year-month-day`, at noon so that formatting it as a
@@ -30,6 +68,7 @@ private final class ESPNFixtureURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return
         }
+        RequestLog.log(for: request)?.record(url)
         let fixture = Self.fixtureURL(for: url).flatMap { try? Data(contentsOf: $0) }
         let response = HTTPURLResponse(url: url,
                                        statusCode: fixture == nil ? 404 : 200,

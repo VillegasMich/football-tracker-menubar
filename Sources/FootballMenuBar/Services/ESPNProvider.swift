@@ -16,10 +16,12 @@ struct ESPNProvider: MatchDataProvider {
     /// `YYYYMMDD` of its local calendar date, so the query matches the date the
     /// user sees in the header. A future fix for late-night kickoffs that ESPN
     /// files under an adjacent day (design D5) can widen this to a 2-day range
-    /// here without touching callers.
+    /// here without touching callers. `limit=` asks for up to 1000 Matches:
+    /// without it ESPN returns at most 100, cutting off a busy day.
     private func scoreboardURL(slug: String, day: Date) -> URL {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/soccer/\(slug)/scoreboard")!
-        components.queryItems = [URLQueryItem(name: "dates", value: Self.espnDay(day))]
+        components.queryItems = [URLQueryItem(name: "dates", value: Self.espnDay(day)),
+                                 URLQueryItem(name: "limit", value: "1000")]
         return components.url!
     }
 

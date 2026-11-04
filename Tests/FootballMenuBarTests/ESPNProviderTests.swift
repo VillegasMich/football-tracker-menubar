@@ -266,6 +266,21 @@ struct ESPNProviderTests {
             return
         }
     }
+
+    @Test("Every scoreboard request asks for up to 1000 Matches")
+    func requestsAskForUpTo1000Matches() async {
+        // Without `limit`, the Primary Source returns at most 100 events.
+        let log = RequestLog()
+        let provider = ESPNProvider(session: .espnFixtures(recordingInto: log))
+
+        _ = await provider.matches(for: [premierLeague, championsLeague], on: localDay(2026, 11, 1))
+
+        let limits = log.urls.map { url in
+            URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first { $0.name == "limit" }?.value
+        }
+        #expect(limits == ["1000", "1000"])
+    }
 }
 
 private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League")
