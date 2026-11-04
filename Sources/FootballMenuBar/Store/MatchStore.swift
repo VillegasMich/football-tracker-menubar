@@ -6,7 +6,9 @@ import Combine
 /// environment for views to read.
 ///
 /// It maintains two logically separate feeds:
-/// - the **browse feed** (`matches`) for `selectedDate`, powering the popover;
+/// - the **browse feed** (`matches`) for `selectedDate`, powering the popover.
+///   Each Competition loads independently: one that fails keeps its last
+///   Matches for that day, and its load status says so;
 /// - the **ticker feed** (`pinnedSnapshot`) for the pinned match, powering the
 ///   menu bar title independently of which day is browsed.
 ///
@@ -28,8 +30,20 @@ final class MatchStore: ObservableObject {
     }()
 
     // MARK: - Browse feed
+    /// The browsed day's Matches: each Competition's from its last successful
+    /// fetch that day, in Competition order.
     @Published private(set) var matches: [Match] = []
+    /// Set only when every requested Competition failed and no Matches are
+    /// loaded for the browsed day: the full-screen error.
     @Published private(set) var errorMessage: String?
+    /// Each Competition's load status for the browsed day, by slug.
+    @Published private(set) var loadStatusBySlug: [String: CompetitionLoadStatus] = [:]
+    /// Each Competition's Matches from its last successful fetch of
+    /// `lastMatchesDay`, by slug. A Competition with no successful fetch that
+    /// day has no entry.
+    private var lastMatchesBySlug: [String: [Match]] = [:]
+    /// The day `lastMatchesBySlug` belongs to.
+    private var lastMatchesDay: Date?
     @Published private(set) var isRefreshing = false
     /// True while a date step's fetch is in flight — distinct from `isRefreshing`
     /// so the view can keep the prior day's list visible during a step.
@@ -149,14 +163,18 @@ final class MatchStore: ObservableObject {
     /// rather than flashing empty the moment `selectedDate` changes.
     var visibleMatches: [Match] { matches }
 
-    /// Matches grouped by Competition in the supported-Competition order, for display.
-    var matchesByCompetition: [(competition: Competition, matches: [Match])] {
+    /// Matches grouped by Competition in the supported-Competition order, with
+    /// each Competition's load status, for display. A Competition with no
+    /// Matches is left out unless it failed to load, so the list can say so.
+    var matchesByCompetition: [(competition: Competition, status: CompetitionLoadStatus, matches: [Match])] {
         let visible = visibleMatches
         return competitions.compactMap { competition in
             let group = visible
                 .filter { $0.competitionSlug == competition.slug }
                 .sorted(by: Self.displayOrder)
-            return group.isEmpty ? nil : (competition, group)
+            let status = loadStatusBySlug[competition.slug] ?? .loaded
+            guard !group.isEmpty || status == .failedToLoad else { return nil }
+            return (competition, status, group)
         }
     }
 
@@ -263,17 +281,44 @@ final class MatchStore: ObservableObject {
     /// Load the browse feed for `target`. Results are discarded if the selected
     /// day changed while the fetch was in flight (out-of-order guard).
     private func loadBrowse(for target: Date) async {
-        do {
-            let fetched = try await provider.matches(for: competitions, on: target).values.flatMap { try $0.get() }
-            guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
-            matches = fetched
-            errorMessage = nil
-            updateSnapshotFromBrowse(fetched)
-        } catch {
-            guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
-            errorMessage = Self.describe(error)
-        }
+        let results = await provider.matches(for: competitions, on: target)
+        guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
+        applyBrowseResults(results, for: target)
+        updateSnapshotFromBrowse(results)
         hasLoadedOnce = true
+    }
+
+    /// Merge one fetch of `day` into the browse feed. A Competition that
+    /// succeeded shows its new Matches. One that failed keeps the Matches of
+    /// its last success that day (stale), or, with no success that day yet,
+    /// is marked failed to load. A new day starts with no last Matches.
+    private func applyBrowseResults(_ results: CompetitionResults, for day: Date) {
+        if let lastDay = lastMatchesDay, Calendar.current.isDate(lastDay, inSameDayAs: day) {
+            // Same day: earlier successes still stand.
+        } else {
+            lastMatchesBySlug = [:]
+            lastMatchesDay = day
+        }
+
+        var statuses: [String: CompetitionLoadStatus] = [:]
+        var firstFailure: MatchDataError?
+        for competition in competitions {
+            let slug = competition.slug
+            if case .success(let fetched)? = results[slug] {
+                lastMatchesBySlug[slug] = fetched
+                statuses[slug] = .loaded
+            } else {
+                if case .failure(let error)? = results[slug], firstFailure == nil {
+                    firstFailure = error
+                }
+                statuses[slug] = lastMatchesBySlug[slug] == nil ? .failedToLoad : .stale
+            }
+        }
+
+        matches = competitions.flatMap { lastMatchesBySlug[$0.slug] ?? [] }
+        loadStatusBySlug = statuses
+        let everyCompetitionFailed = !competitions.isEmpty && !statuses.values.contains(.loaded)
+        errorMessage = everyCompetitionFailed && matches.isEmpty ? Self.describe(firstFailure) : nil
     }
 
     // MARK: - Ticker feed
@@ -303,8 +348,9 @@ final class MatchStore: ObservableObject {
     /// authoritative for the snapshot (including clearing it if the match is
     /// absent). When browsing another day, leave the snapshot untouched. Browse
     /// refreshes are live observation, so they go through as a poll.
-    private func updateSnapshotFromBrowse(_ fetched: [Match]) {
+    private func updateSnapshotFromBrowse(_ results: CompetitionResults) {
         guard let id = pinnedMatchID, pinnedDayIsBrowsed else { return }
+        let fetched = results.values.flatMap { (try? $0.get()) ?? [] }
         setPinnedSnapshot(fetched.first { $0.id == id }, source: .poll)
     }
 
@@ -331,12 +377,14 @@ final class MatchStore: ObservableObject {
         return a.kickoff < b.kickoff
     }
 
-    private static func describe(_ error: Error) -> String {
+    /// User text for the full-screen error. `nil` when the data source gave no
+    /// reason (it left a requested Competition out).
+    private static func describe(_ error: MatchDataError?) -> String {
         switch error {
-        case MatchDataError.network: return "Couldn't reach the scores service."
-        case MatchDataError.decoding: return "Received an unexpected response."
-        case MatchDataError.badResponse(let status): return "Scores service error (\(status))."
-        default: return "Something went wrong fetching scores."
+        case .network: return "Couldn't reach the scores service."
+        case .decoding: return "Received an unexpected response."
+        case .badResponse(let status): return "Scores service error (\(status))."
+        case nil: return "Something went wrong fetching scores."
         }
     }
 }
