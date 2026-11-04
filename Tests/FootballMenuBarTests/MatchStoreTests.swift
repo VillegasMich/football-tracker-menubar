@@ -93,6 +93,62 @@ final class MatchStoreTests {
         #expect(store.errorMessage == nil)
     }
 
+    // MARK: - Full-screen error
+
+    @Test("The full-screen error shows when every Competition failed and nothing is loaded")
+    func fullScreenErrorWhenEverythingFailed() async {
+        let store = makeStore()
+        provider.fail(premierLeague)
+        provider.fail(championsLeague)
+
+        await store.loadInitial()
+
+        #expect(store.errorMessage == "Couldn't reach the scores service.")
+        #expect(store.matches.isEmpty)
+    }
+
+    @Test("No full-screen error when every Competition failed but earlier Matches are still shown")
+    func noFullScreenErrorWithStaleMatches() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await store.loadInitial()
+
+        provider.fail(premierLeague)
+        provider.fail(championsLeague)
+        await store.refresh()
+
+        #expect(store.errorMessage == nil)
+        #expect(store.matchesByCompetition.map(\.status) == [.stale])
+    }
+
+    @Test("No full-screen error when only some Competitions failed, even with nothing loaded")
+    func noFullScreenErrorWhenSomeSucceeded() async {
+        let store = makeStore()
+        provider.fail(premierLeague)
+        provider.succeed(championsLeague, with: [])
+
+        await store.loadInitial()
+
+        #expect(store.errorMessage == nil)
+        #expect(store.matchesByCompetition.map(\.status) == [.failedToLoad])
+    }
+
+    @Test("The full-screen error clears once a Competition loads again")
+    func fullScreenErrorClearsOnRetry() async {
+        let store = makeStore()
+        provider.fail(premierLeague)
+        provider.fail(championsLeague)
+        await store.loadInitial()
+
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await store.refresh()
+
+        #expect(store.errorMessage == nil)
+        #expect(store.matches == [arsenalChelsea])
+    }
+
+    // MARK: - Browsed day
+
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
     func newDayStartsFresh() async {
         let store = makeStore()
