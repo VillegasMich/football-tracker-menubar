@@ -14,14 +14,16 @@ enum MatchState: String, Codable, Sendable {
     /// when play stopped.
     case abandoned
 
-    /// The word shown in place of a score for a Match that was never played:
-    /// "Postponed" or "Cancelled" (the Primary Source spells it "Canceled").
+    /// Our own word for a status, shown in place of the Primary Source's
+    /// detail: "Postponed", "Cancelled" (the Primary Source spells it
+    /// "Canceled") or "Abandoned" (the Primary Source's `ABN` or `Susp`).
     /// `nil` for every other status.
-    var unplayedStatusWord: String? {
+    var statusWord: String? {
         switch self {
         case .postponed: return "Postponed"
         case .cancelled: return "Cancelled"
-        case .upcoming, .inProgress, .finished, .abandoned: return nil
+        case .abandoned: return "Abandoned"
+        case .upcoming, .inProgress, .finished: return nil
         }
     }
 
@@ -29,12 +31,11 @@ enum MatchState: String, Codable, Sendable {
     /// lives:
     /// - `STATUS_POSTPONED` → Postponed; `STATUS_CANCELED` → Cancelled. Both
     ///   arrive with state `post` and `completed: false`.
-    /// - state `in` → Live, whatever the name, so a suspended Match that
-    ///   resumes is Live again.
+    /// - state `in` → Live for every other name, `STATUS_SUSPENDED` included,
+    ///   so a Match that resumes after a stoppage is Live again.
     /// - `STATUS_ABANDONED` or `STATUS_SUSPENDED` in state `post` → Abandoned.
     ///   Both arrive with `completed: false` and the score from when play
-    ///   stopped. A suspended Match the Primary Source has stopped, and not
-    ///   yet resumed, counts as Abandoned.
+    ///   stopped: a stopped Match that has not resumed counts as Abandoned.
     /// - state `post` → Finished only with `completed: true`.
     /// - anything else, including an unknown name in state `post`, →
     ///   Upcoming, so a shape change never crashes the app or drops a Match.

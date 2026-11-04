@@ -140,8 +140,9 @@ private struct MenuBarLabel: View {
                                        attributes: [.font: scoreFont, .foregroundColor: textColor])
         let scoreSize = score.size()
         // Optional suffix after the away team, e.g. `(Abd)` for an Abandoned Match.
-        let suffix = MenuBarTitle.suffix(for: match).map {
-            NSAttributedString(string: $0, attributes: [.font: scoreFont, .foregroundColor: textColor])
+        let suffix = MenuBarTitle.suffix(for: match).map { text -> (image: NSImage?, text: NSAttributedString?, width: CGFloat) in
+            let s = NSAttributedString(string: text, attributes: [.font: scoreFont, .foregroundColor: textColor])
+            return (nil, s, s.size().width)
         }
 
         // Optional live pill.
@@ -153,7 +154,7 @@ private struct MenuBarLabel: View {
         let pillWidth: CGFloat = showPill ? (pillText.map { $0.size().width + 10 } ?? 7) : 0
 
         var width = home.width + gap + scoreSize.width + gap + away.width
-        if let suffix { width += gap + suffix.size().width }
+        if let suffix { width += gap + suffix.width }
         if showPill { width += gap + pillWidth }
         width = ceil(width) + 2
 
@@ -182,9 +183,7 @@ private struct MenuBarLabel: View {
 
         if let suffix {
             x += gap
-            let suffixSize = suffix.size()
-            suffix.draw(at: NSPoint(x: x, y: (height - suffixSize.height) / 2))
-            x += suffixSize.width
+            draw(suffix)
         }
 
         if showPill {

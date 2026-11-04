@@ -52,7 +52,7 @@ enum MenuBarTitle {
         case .inProgress, .finished, .abandoned:
             return match.score.display
         case .postponed, .cancelled:
-            return match.state.unplayedStatusWord ?? match.statusDetail
+            return match.state.statusWord ?? match.statusDetail
         }
     }
 }

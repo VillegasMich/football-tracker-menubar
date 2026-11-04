@@ -64,8 +64,8 @@ struct ESPNProviderTests {
         #expect(match.score == Score(home: 1, away: 0))
     }
 
-    @Test("A suspended Match that has not resumed decodes as Abandoned with its partial score")
-    func suspendedMatch() async throws {
+    @Test("A stopped Match that has not resumed (`STATUS_SUSPENDED`) decodes as Abandoned with its partial score")
+    func stoppedNotResumedMatch() async throws {
         // National League, dated 15 Dec 2026: Barrow 1–0 Forest Green Rovers,
         // stopped at 18' (`STATUS_SUSPENDED`, state `post`, `completed: false`,
         // shortDetail `Susp`).
@@ -79,9 +79,9 @@ struct ESPNProviderTests {
         #expect(match.score == Score(home: 1, away: 0))
     }
 
-    @Test("A suspended Match back in play decodes as Live")
-    func resumedSuspendedMatch() async throws {
-        // EDITED fixture, not a verbatim response: the real suspended Match
+    @Test("A stopped Match that has resumed (`STATUS_SUSPENDED` in state `in`) decodes as Live")
+    func resumedMatch() async throws {
+        // EDITED fixture, not a verbatim response: the real stopped Match
         // above (Barrow 1–0 Forest Green Rovers, 15 Dec 2026) with only the
         // event's `status.type.state` changed from `post` to `in`. The name
         // stays `STATUS_SUSPENDED`. No real resumed Match has been observed.

@@ -51,18 +51,15 @@ struct MatchRowPresentation {
             } else {
                 badgeText = match.statusDetail
             }
-        case .inProgress, .finished:
+        case .inProgress, .finished, .abandoned:
+            // An Abandoned Match keeps the score from when play stopped, with
+            // our own word as its badge.
             score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-            badgeText = match.statusDetail
-        case .abandoned:
-            // The score from when play stopped; our own word, not the
-            // Primary Source's `ABN` or `Susp`.
-            score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-            badgeText = "Abandoned"
+            badgeText = match.state.statusWord ?? match.statusDetail
         case .postponed, .cancelled:
             // Never played, so no score; our own word, not the Primary Source's.
             score = .dash
-            badgeText = match.state.unplayedStatusWord ?? match.statusDetail
+            badgeText = match.state.statusWord ?? match.statusDetail
         }
     }
 }
