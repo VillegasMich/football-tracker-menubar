@@ -199,7 +199,8 @@ final class MatchStore: ObservableObject {
     /// Matches never reach the list.
     private var unfollowedPinnedCompetition: Competition? {
         guard pinnedMatchID != nil, let slug = pinnedCompetitionSlug,
-              !followedCompetitions.contains(where: { $0.slug == slug })
+              !followedCompetitions.contains(where: { $0.slug == slug }),
+              pinnedDay >= Calendar.current.startOfDay(for: Date())
         else { return nil }
         return Competition.inCatalogue(slugs: [slug]).first
     }

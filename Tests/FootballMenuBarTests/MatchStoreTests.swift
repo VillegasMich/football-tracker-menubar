@@ -363,6 +363,34 @@ final class MatchStoreTests {
         #expect(store.matches == [parisBayern])
     }
 
+    @Test("After unpinning, the unfollowed Competition is no longer requested")
+    func unpinStopsRequestingUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        store.unpin()
+        await store.loadInitial()
+        await makeStore().loadInitial()
+
+        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+    }
+
+    @Test("Once the Pinned Match's day is over, its unfollowed Competition is no longer requested, and the snapshot keeps its last value")
+    func pastDayStopsRequestingUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(yesterdayArsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+        #expect(store.pinnedMatchID == yesterdayArsenalChelsea.id)
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
