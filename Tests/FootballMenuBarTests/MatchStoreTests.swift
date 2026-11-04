@@ -69,6 +69,28 @@ final class MatchStoreTests {
                 == ["Premier League", "Champions League", "World Cup"])
     }
 
+    @Test("Unfollowing the last Followed Competition is refused")
+    func lastCompetitionCannotBeUnfollowed() {
+        let settings = AppSettings(defaults: defaults)
+        settings.unfollow(worldCup)
+        settings.unfollow(championsLeague)
+        #expect(settings.canUnfollow(premierLeague) == false)
+
+        settings.unfollow(premierLeague)
+
+        #expect(settings.followedCompetitions == [premierLeague])
+        #expect(AppSettings(defaults: defaults).followedCompetitions == [premierLeague])
+    }
+
+    @Test("A Followed Competition can be unfollowed while another is followed")
+    func competitionCanBeUnfollowedWhileAnotherIsFollowed() {
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.isFollowed(worldCup))
+        #expect(settings.canUnfollow(worldCup))
+        #expect(!settings.isFollowed(laLiga))
+    }
+
     // MARK: - A Competition that fails
 
     @Test("A failed Competition keeps its last Matches and is marked stale, while the others update")

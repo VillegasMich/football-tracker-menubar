@@ -119,9 +119,21 @@ final class AppSettings: ObservableObject {
         setFollowed(followedCompetitions + [competition])
     }
 
-    /// Stop following `competition`.
+    /// Stop following `competition`. Refused (a no-op) when it is the last
+    /// Followed Competition: see `canUnfollow(_:)`.
     func unfollow(_ competition: Competition) {
+        guard canUnfollow(competition) else { return }
         setFollowed(followedCompetitions.filter { $0 != competition })
+    }
+
+    func isFollowed(_ competition: Competition) -> Bool {
+        followedCompetitions.contains(competition)
+    }
+
+    /// False only for the last Followed Competition, which can't be
+    /// unfollowed so that at least one is always followed.
+    func canUnfollow(_ competition: Competition) -> Bool {
+        followedCompetitions != [competition]
     }
 
     private func setFollowed(_ competitions: [Competition]) {
