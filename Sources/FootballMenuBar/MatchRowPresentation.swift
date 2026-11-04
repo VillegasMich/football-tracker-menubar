@@ -12,7 +12,8 @@ struct MatchRowPresentation {
 
     /// Text of the status badge. For Upcoming Matches the Primary Source's
     /// detail is unreliable (often just a date), so the local kickoff time
-    /// (e.g. `7:00 PM`) is shown instead when the kickoff is known.
+    /// (e.g. `7:00 PM`) is shown instead when the kickoff is known, or "TBD"
+    /// when the Primary Source hasn't confirmed it.
     let badgeText: String
     /// Whether the row uses the Live style (red badge, bold score).
     let isLiveStyle: Bool
@@ -36,7 +37,11 @@ struct MatchRowPresentation {
         switch match.state {
         case .upcoming:
             score = .dash
-            if match.kickoff != .distantFuture {
+            if !match.isKickoffConfirmed {
+                // A nominal time the Primary Source hasn't confirmed: never
+                // shown as if it were exact.
+                badgeText = Match.toBeDecidedLabel
+            } else if match.kickoff != .distantFuture {
                 let f = DateFormatter()
                 f.locale = locale
                 f.timeZone = timeZone

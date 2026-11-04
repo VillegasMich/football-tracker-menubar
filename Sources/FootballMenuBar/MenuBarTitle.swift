@@ -7,7 +7,8 @@ import Foundation
 enum MenuBarTitle {
     /// Title for the pinned match, or `nil` when there is nothing to show.
     /// - live / finished: `"ARS 1 – 0 CHE"` (abbreviations + score)
-    /// - upcoming: `"ARS 7:00 PM CHE"` (abbreviations + kickoff time)
+    /// - upcoming: `"ARS 7:00 PM CHE"` (abbreviations + kickoff time), or
+    ///   `"ARS TBD CHE"` when the kickoff is unconfirmed
     /// - postponed / cancelled: `"ARS Postponed CHE"`, `"ARS Cancelled CHE"`
     /// - abandoned: `"ARS 1 – 0 CHE (Abd)"` (score from when play stopped)
     /// - finished after a Penalty Shootout: `"PSG 1 – 1 ARS (4–3p)"`
@@ -38,14 +39,15 @@ enum MenuBarTitle {
     }
 
     /// The state-dependent middle segment shared by the text title and the
-    /// logo-mode title: the score while in-progress, finished or abandoned, the
-    /// kickoff time while upcoming, and the status word when postponed or
-    /// cancelled.
+    /// logo-mode title: the score while Live, Finished or Abandoned, the
+    /// kickoff time while Upcoming ("TBD" while that time is unconfirmed), and
+    /// the status word when Postponed or Cancelled.
     static func middle(for match: Match,
                        locale: Locale = .autoupdatingCurrent,
                        timeZone: TimeZone = .autoupdatingCurrent) -> String {
         switch match.state {
         case .upcoming:
+            guard match.isKickoffConfirmed else { return Match.toBeDecidedLabel }
             // Short, locale-aware kickoff time, e.g. `7:00 PM`.
             let f = DateFormatter()
             f.locale = locale

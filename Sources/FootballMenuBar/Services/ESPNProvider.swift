@@ -98,6 +98,10 @@ private struct Event: Decodable {
     }
 
     struct Competition: Decodable {
+        /// Whether the kickoff time is confirmed. `false` on Cup Matches
+        /// with a nominal time (shortDetail `TBD`). Optional so an absent
+        /// flag never fails decoding; absent counts as confirmed.
+        let timeValid: Bool?
         let competitors: [Competitor]
         struct Competitor: Decodable {
             let homeAway: String
@@ -122,23 +126,45 @@ private struct Event: Decodable {
         }
     }
 
+    /// The Primary Source's placeholder teams for a Cup round whose teams
+    /// aren't decided yet: `TBD Home` (131556) and `TBD Away` (131554). Seen
+    /// with these ids on all nine placeholder Matches of the 2026–27 Coppa
+    /// Italia, from the quarter-finals to the final. Matched by id rather
+    /// than name: ids are the Primary Source's stable identity for a team,
+    /// while names are display text. The responses carry no placeholder flag.
+    private static let placeholderTeamIDs: Set<String> = ["131556", "131554"]
+
+    /// Maps an ESPN team to the app's `Team`. A placeholder team keeps its id
+    /// but is named and abbreviated plain "TBD", with no logo, instead of the
+    /// Primary Source's `TBD Home` / `TBD Away`.
+    private static func team(from dto: Competition.Competitor.TeamDTO) -> Team {
+        if placeholderTeamIDs.contains(dto.id) {
+            return Team(id: dto.id, name: Match.toBeDecidedLabel,
+                        abbreviation: Match.toBeDecidedLabel, logoURL: nil)
+        }
+        return Team(id: dto.id,
+                    name: dto.displayName,
+                    abbreviation: dto.abbreviation ?? "",
+                    logoURL: dto.logo.flatMap(URL.init(string:)))
+    }
+
     /// Maps an ESPN event to the app's `Match`, or nil if it lacks the two
-    /// competitors we require.
+    /// competitors we require or both of its teams are placeholders. A Match
+    /// with one placeholder team is kept, so a team's next Cup Match shows
+    /// before its opponent is known.
     func toMatch(leagueSlug: String) -> Match? {
         guard let competition = competitions.first else { return nil }
         guard
             let homeC = competition.competitors.first(where: { $0.homeAway == "home" }),
             let awayC = competition.competitors.first(where: { $0.homeAway == "away" })
         else { return nil }
+        if Self.placeholderTeamIDs.contains(homeC.team.id),
+           Self.placeholderTeamIDs.contains(awayC.team.id) {
+            return nil
+        }
 
-        let home = Team(id: homeC.team.id,
-                        name: homeC.team.displayName,
-                        abbreviation: homeC.team.abbreviation ?? "",
-                        logoURL: homeC.team.logo.flatMap(URL.init(string:)))
-        let away = Team(id: awayC.team.id,
-                        name: awayC.team.displayName,
-                        abbreviation: awayC.team.abbreviation ?? "",
-                        logoURL: awayC.team.logo.flatMap(URL.init(string:)))
+        let home = Self.team(from: homeC.team)
+        let away = Self.team(from: awayC.team)
         let score = Score(home: Int(homeC.score ?? "") ?? 0,
                           away: Int(awayC.score ?? "") ?? 0)
         // Read only from `shootoutScore`, never from `score`, so the Match
@@ -160,7 +186,8 @@ private struct Event: Decodable {
                               state: status.type.state,
                               completed: status.type.completed),
             statusDetail: status.type.shortDetail ?? status.type.detail ?? "",
-            kickoff: Self.parseDate(date) ?? .distantFuture
+            kickoff: Self.parseDate(date) ?? .distantFuture,
+            isKickoffConfirmed: competition.timeValid ?? true
         )
     }
 

@@ -17,6 +17,35 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.text(for: match, locale: britishEnglish, timeZone: madrid) == "ARS 20:00 CHE")
     }
 
+    @Test("An Upcoming Match with an unconfirmed kickoff shows TBD between the abbreviations")
+    func upcomingUnconfirmedShowsTBD() {
+        let title = MenuBarTitle.text(for: unconfirmedCarabaoQuarterFinal,
+                                      locale: britishEnglish, timeZone: madrid)
+
+        #expect(title == "LIV TBD BOU")
+    }
+
+    @Test("A Match with one placeholder team and an unconfirmed kickoff shows TBD for both the kickoff and that team")
+    func onePlaceholderTeamUnconfirmed() {
+        // AS Roma v a placeholder team, as decoding gives it: plain "TBD",
+        // keeping the Primary Source's placeholder id 131554.
+        let placeholder = Team(id: "131554", name: "TBD", abbreviation: "TBD", logoURL: nil)
+        let roma = Team(id: "104", name: "AS Roma", abbreviation: "ROMA", logoURL: nil)
+        let match = makeMatch(state: .upcoming, statusDetail: "TBD",
+                              kickoff: utc("2027-02-03T20:00Z"), isKickoffConfirmed: false,
+                              home: roma, away: placeholder)
+
+        #expect(MenuBarTitle.text(for: match, locale: britishEnglish, timeZone: madrid) == "ROMA TBD TBD")
+    }
+
+    @Test("The logo-mode title shows TBD for an Upcoming Match with an unconfirmed kickoff, with no suffix")
+    func logoModeUpcomingUnconfirmed() {
+        let match = unconfirmedCarabaoQuarterFinal
+
+        #expect(MenuBarTitle.middle(for: match, locale: britishEnglish, timeZone: madrid) == "TBD")
+        #expect(MenuBarTitle.suffix(for: match) == nil)
+    }
+
     @Test("A Live Match shows the Match score between the abbreviations")
     func liveShowsScore() {
         let match = makeMatch(state: .inProgress, statusDetail: "63'", score: Score(home: 1, away: 0))

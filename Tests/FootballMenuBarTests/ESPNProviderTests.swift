@@ -140,6 +140,98 @@ struct ESPNProviderTests {
         #expect(match.penaltyShootout == nil)
     }
 
+    @Test("Upcoming Matches whose kickoff the Primary Source hasn't confirmed decode with an unconfirmed kickoff")
+    func unconfirmedKickoffs() async throws {
+        // Carabao Cup quarter-finals, 15 Dec 2026: Crystal Palace v Sunderland,
+        // Fleetwood Town v Everton, Liverpool v AFC Bournemouth and Manchester
+        // City v Bradford City, all at a nominal 20:00Z with `timeValid: false`
+        // and shortDetail `TBD`.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [carabaoCup], on: localDay(2026, 12, 15))
+
+        #expect(Set(matches.map(\.id)) == ["401932163", "401932186", "401932187", "401932185"])
+        for match in matches {
+            #expect(match.state == .upcoming)
+            #expect(!match.isKickoffConfirmed)
+        }
+        let liverpool = try #require(matches.first { $0.id == "401932187" })
+        #expect(liverpool.home.name == "Liverpool")
+        #expect(liverpool.away.name == "AFC Bournemouth")
+    }
+
+    @Test("A Match whose teams are both placeholders produces no Match")
+    func bothPlaceholderTeamsDropped() async throws {
+        // Coppa Italia, 3 Feb 2027: four quarter-finals, each `TBD Home`
+        // (team id 131556) v `TBD Away` (team id 131554), `timeValid: false`.
+        // No real day mixes these with a real Match; see the edited fixture
+        // below for that.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [coppaItalia], on: localDay(2027, 2, 3))
+
+        #expect(matches.isEmpty)
+    }
+
+    @Test("A Match with one placeholder team is kept, while both-placeholder Matches in the same response are dropped")
+    func onePlaceholderTeamKept() async throws {
+        // EDITED fixture, not a verbatim response: the real Coppa Italia
+        // response above (3 Feb 2027) with only Match 401912254's home
+        // competitor (`TBD Home`) replaced by AS Roma's, copied from the real
+        // Coppa Italia Match 401912496. The other three Matches are unchanged.
+        // No real one-placeholder Match has been observed.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedTeams], on: localDay(2027, 2, 3))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401912254")
+        #expect(match.home.name == "AS Roma")
+        #expect(match.state == .upcoming)
+        #expect(!match.isKickoffConfirmed)
+    }
+
+    @Test("A Match's single placeholder team shows as plain TBD, not the Primary Source's TBD Away")
+    func singlePlaceholderTeamIsTBD() async throws {
+        // Same EDITED fixture as above: AS Roma v the Primary Source's
+        // placeholder `TBD Away` (team id 131554, abbreviation `TBD Away`,
+        // empty logo).
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedTeams], on: localDay(2027, 2, 3))
+
+        let match = try #require(matches.only)
+        #expect(match.away == Team(id: "131554", name: "TBD", abbreviation: "TBD", logoURL: nil))
+        #expect(match.home == Team(id: "104", name: "AS Roma", abbreviation: "ROMA",
+                                   logoURL: URL(string: "https://a.espncdn.com/i/teamlogos/soccer/500/104.png")))
+    }
+
+    @Test("A kickoff the Primary Source has confirmed decodes as confirmed")
+    func confirmedKickoff() async throws {
+        // Premier League, 1 Nov 2026: Liverpool 0–1 Arsenal, `timeValid: true`.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [premierLeague], on: localDay(2026, 11, 1))
+
+        let match = try #require(matches.only)
+        #expect(match.isKickoffConfirmed)
+    }
+
+    @Test("A kickoff without the Primary Source's confirmation flag counts as confirmed")
+    func kickoffWithoutFlagIsConfirmed() async throws {
+        // EDITED fixture, not a verbatim response: the real Premier League
+        // response above (Liverpool 0–1 Arsenal, 1 Nov 2026) with only the
+        // competition's `timeValid` flag removed. Every real response seen so
+        // far carries the flag.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedKickoff], on: localDay(2026, 11, 1))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401879246")
+        #expect(match.isKickoffConfirmed)
+    }
+
     @Test("A Match with an unrecognised status name is kept and decodes as Upcoming, not Finished")
     func unrecognisedStatusName() async throws {
         // EDITED fixture, not a verbatim response: the real Postponed Match
@@ -162,8 +254,14 @@ private let faCupQualifying = League(slug: "eng.fa_qual", displayName: "FA Cup Q
 private let peruLiga1 = League(slug: "per.1", displayName: "Liga 1 (Peru)")
 private let championsLeague = League(slug: "uefa.champions", displayName: "Champions League")
 private let nationalLeague = League(slug: "eng.5", displayName: "National League")
+private let carabaoCup = League(slug: "eng.league_cup", displayName: "Carabao Cup")
+private let coppaItalia = League(slug: "ita.coppa_italia", displayName: "Coppa Italia")
 /// Test-only slug serving fixtures edited from real responses.
 private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")
+/// Test-only slug serving a real response with one placeholder team replaced.
+private let editedTeams = League(slug: "test.edited-teams", displayName: "Edited teams (test only)")
+/// Test-only slug serving a real response with its `timeValid` flag removed.
+private let editedKickoff = League(slug: "test.edited-kickoff", displayName: "Edited kickoff (test only)")
 
 fileprivate extension Array {
     /// The single element, or `nil` when there are zero or several.
