@@ -16,6 +16,44 @@ struct MatchRowPresentationTests {
         #expect(!row.isLiveStyle)
     }
 
+    @Test("An Upcoming Match with an unconfirmed kickoff shows TBD instead of a time, and a dash")
+    func upcomingUnconfirmedShowsTBD() {
+        let row = MatchRowPresentation(match: unconfirmedCarabaoQuarterFinal,
+                                       locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == "TBD")
+        #expect(row.score == .dash)
+        #expect(!row.isLiveStyle)
+        #expect(!row.offersHighlights)
+    }
+
+    @Test("An Upcoming Match with an unconfirmed kickoff shows TBD whatever the Primary Source's detail says")
+    func upcomingUnconfirmedIgnoresDetail() {
+        // "TBD" is our own label, not the Primary Source's shortDetail.
+        let match = makeMatch(state: .upcoming, statusDetail: "Tue, December 15th at 3:00 PM EST",
+                              kickoff: utc("2026-12-15T20:00Z"), isKickoffConfirmed: false)
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == "TBD")
+    }
+
+    @Test("An unconfirmed kickoff changes only Upcoming Matches",
+          arguments: [
+              (MatchState.inProgress, "63'", "63'"),
+              (.finished, "FT", "FT"),
+              (.postponed, "Postponed", "Postponed"),
+              (.cancelled, "Canceled", "Cancelled"),
+              (.abandoned, "ABN", "Abandoned"),
+          ])
+    func unconfirmedKickoffOnlyChangesUpcoming(state: MatchState, primarySourceDetail: String, badge: String) {
+        let match = makeMatch(state: state, statusDetail: primarySourceDetail, isKickoffConfirmed: false)
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == badge)
+    }
+
     @Test("A Live Match shows the live detail in the Live style")
     func liveShowsLiveDetailInLiveStyle() {
         let match = makeMatch(state: .inProgress, statusDetail: "63'", score: Score(home: 1, away: 0))

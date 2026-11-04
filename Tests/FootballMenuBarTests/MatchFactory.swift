@@ -37,5 +37,18 @@ func utc(_ string: String) -> Date {
 let paris = Team(id: "160", name: "Paris Saint-Germain", abbreviation: "PSG", logoURL: nil)
 let arsenal = Team(id: "359", name: "Arsenal", abbreviation: "ARS", logoURL: nil)
 
+/// The teams of a 2026–27 Carabao Cup quarter-final whose kickoff the Primary
+/// Source hasn't confirmed, as it names them.
+let liverpool = Team(id: "364", name: "Liverpool", abbreviation: "LIV", logoURL: nil)
+let bournemouth = Team(id: "349", name: "AFC Bournemouth", abbreviation: "BOU", logoURL: nil)
+
+/// Liverpool v AFC Bournemouth, Carabao Cup quarter-final, 15 Dec 2026, as the
+/// Primary Source lists it: Upcoming, a nominal 20:00Z kickoff, `timeValid:
+/// false` and shortDetail `TBD`.
+let unconfirmedCarabaoQuarterFinal = makeMatch(state: .upcoming, statusDetail: "TBD",
+                                               kickoff: utc("2026-12-15T20:00Z"),
+                                               isKickoffConfirmed: false,
+                                               home: liverpool, away: bournemouth)
+
 let madrid = TimeZone(identifier: "Europe/Madrid")!
 let britishEnglish = Locale(identifier: "en_GB")
