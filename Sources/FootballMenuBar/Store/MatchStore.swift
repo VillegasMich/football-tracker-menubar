@@ -330,28 +330,39 @@ final class MatchStore: ObservableObject {
         await refreshTicker(source: .seed)
     }
 
-    /// Fetch the pinned match's day and update its snapshot. A successful fetch
-    /// that no longer contains the pinned id clears the snapshot (⇒ ⚽); a
-    /// transient failure keeps the last snapshot. `source` distinguishes the
-    /// launch seed from a live poll tick for notification purposes.
+    /// Fetch the pinned match's day and update its snapshot (see
+    /// `updateSnapshot(from:id:source:)`). `source` distinguishes the launch
+    /// seed from a live poll tick for notification purposes.
     private func refreshTicker(source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
-        do {
-            let fetched = try await provider.matches(for: competitions, on: pinnedDay).values.flatMap { try $0.get() }
-            setPinnedSnapshot(fetched.first { $0.id == id }, source: source)
-        } catch {
-            // Keep the last-known snapshot on a transient failure.
-        }
+        let results = await provider.matches(for: competitions, on: pinnedDay)
+        updateSnapshot(from: results, id: id, source: source)
     }
 
     /// When browsing the pinned match's own day, treat the browse fetch as
-    /// authoritative for the snapshot (including clearing it if the match is
-    /// absent). When browsing another day, leave the snapshot untouched. Browse
-    /// refreshes are live observation, so they go through as a poll.
+    /// authoritative for the snapshot, under the same rule as the ticker. When
+    /// browsing another day, leave the snapshot untouched. Browse refreshes are
+    /// live observation, so they go through as a poll.
     private func updateSnapshotFromBrowse(_ results: CompetitionResults) {
         guard let id = pinnedMatchID, pinnedDayIsBrowsed else { return }
-        let fetched = results.values.flatMap { (try? $0.get()) ?? [] }
-        setPinnedSnapshot(fetched.first { $0.id == id }, source: .poll)
+        updateSnapshot(from: results, id: id, source: .poll)
+    }
+
+    /// Update the snapshot of the Pinned Match `id` from a fetch of its day.
+    /// Only a successful fetch of the snapshot's own Competition decides: it
+    /// replaces the snapshot, or clears it (⇒ ⚽) when the Match is no longer
+    /// there. A failure of that Competition keeps the last snapshot. With no
+    /// snapshot yet, the Match is looked for in every Competition that loaded.
+    private func updateSnapshot(from results: CompetitionResults, id: String, source: SnapshotSource) {
+        if let snapshot = pinnedSnapshot {
+            guard case .success(let fetched)? = results[snapshot.competitionSlug] else { return }
+            setPinnedSnapshot(fetched.first { $0.id == id }, source: source)
+        } else {
+            let found = results.values.lazy
+                .compactMap { try? $0.get().first { $0.id == id } }
+                .first
+            if let found { setPinnedSnapshot(found, source: source) }
+        }
     }
 
     /// The single choke point for writing `pinnedSnapshot`. Drives the notifier:
