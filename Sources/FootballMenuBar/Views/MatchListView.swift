@@ -139,7 +139,7 @@ struct MatchListView: View {
                 Text(competition.displayName.uppercased())
                     .font(.caption2.weight(.semibold))
                 if let note = competitionFailureNote(for: status) {
-                    Label(note, systemImage: "exclamationmark.triangle")
+                    Text(note)
                         .font(.caption2)
                 }
             }

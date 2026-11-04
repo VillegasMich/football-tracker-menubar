@@ -7,19 +7,17 @@ extension URLSession {
     /// A request for `.../soccer/{slug}/scoreboard?dates={YYYYMMDD}` is served
     /// `Fixtures/ESPN/{slug}/{YYYYMMDD}.json`. A request with no matching
     /// fixture fails with HTTP 404, so a test never silently hits the network.
-    static var espnFixtures: URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [ESPNFixtureURLProtocol.self]
-        return URLSession(configuration: configuration)
-    }
+    static var espnFixtures: URLSession { espnFixtures(recordingInto: nil) }
 
     /// Like `espnFixtures`, and also records the URL of every request it
     /// receives into `log`.
-    static func espnFixtures(recordingInto log: RequestLog) -> URLSession {
+    static func espnFixtures(recordingInto log: RequestLog?) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ESPNFixtureURLProtocol.self]
-        configuration.httpAdditionalHeaders = [RequestLog.headerName: log.id]
-        RequestLog.register(log)
+        if let log {
+            configuration.httpAdditionalHeaders = [RequestLog.headerName: log.id]
+            RequestLog.register(log)
+        }
         return URLSession(configuration: configuration)
     }
 }

@@ -182,6 +182,21 @@ final class MatchStoreTests {
         #expect(store.pinnedSnapshot == nil)
     }
 
+    @Test("A restored pin with no snapshot yet stays without one while its Competition fails, and gets one once it loads")
+    func restoredPinWithoutSnapshot() async {
+        makeStore().pin(yesterdayArsenalChelsea)
+        let store = makeStore()
+        #expect(store.pinnedMatchID == yesterdayArsenalChelsea.id)
+
+        provider.fail(premierLeague)
+        await store.loadInitial()
+        #expect(store.pinnedSnapshot == nil)
+
+        provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
+        await store.loadInitial()
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -204,18 +219,29 @@ final class MatchStoreTests {
 private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League")
 private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League")
 
-/// Today's kickoff, so a Pinned Match's day is the browsed day.
-private let todayKickoff = Calendar.current.startOfDay(for: Date()).addingTimeInterval(20 * 3600)
+/// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
+/// each use, so it is today for whichever test reads it.
+private var todayKickoff: Date {
+    Calendar.current.startOfDay(for: Date()).addingTimeInterval(20 * 3600)
+}
 
-private let arsenalChelsea = makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
-                                       statusDetail: "8:00 PM", kickoff: todayKickoff)
-private let yesterdayArsenalChelsea = makeMatch(id: "3", competitionSlug: "eng.1", state: .finished,
-                                                statusDetail: "FT", score: Score(home: 2, away: 1),
-                                                kickoff: todayKickoff.addingTimeInterval(-24 * 3600))
+private var arsenalChelsea: Match {
+    makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
+              statusDetail: "8:00 PM", kickoff: todayKickoff)
+}
+private var yesterdayArsenalChelsea: Match {
+    makeMatch(id: "3", competitionSlug: "eng.1", state: .finished,
+              statusDetail: "FT", score: Score(home: 2, away: 1),
+              kickoff: todayKickoff.addingTimeInterval(-24 * 3600))
+}
 private let bayern = Team(id: "132", name: "Bayern Munich", abbreviation: "BAY", logoURL: nil)
-private let parisBayern = makeMatch(id: "2", competitionSlug: "uefa.champions", state: .upcoming,
-                                    statusDetail: "8:00 PM", kickoff: todayKickoff,
-                                    home: paris, away: bayern)
-private let parisBayernLive = makeMatch(id: "2", competitionSlug: "uefa.champions", state: .inProgress,
-                                        statusDetail: "12'", score: Score(home: 1, away: 0),
-                                        kickoff: todayKickoff, home: paris, away: bayern)
+private var parisBayern: Match {
+    makeMatch(id: "2", competitionSlug: "uefa.champions", state: .upcoming,
+              statusDetail: "8:00 PM", kickoff: todayKickoff,
+              home: paris, away: bayern)
+}
+private var parisBayernLive: Match {
+    makeMatch(id: "2", competitionSlug: "uefa.champions", state: .inProgress,
+              statusDetail: "12'", score: Score(home: 1, away: 0),
+              kickoff: todayKickoff, home: paris, away: bayern)
+}

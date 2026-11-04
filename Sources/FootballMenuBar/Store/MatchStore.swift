@@ -293,9 +293,8 @@ final class MatchStore: ObservableObject {
     /// its last success that day (stale), or, with no success that day yet,
     /// is marked failed to load. A new day starts with no last Matches.
     private func applyBrowseResults(_ results: CompetitionResults, for day: Date) {
-        if let lastDay = lastMatchesDay, Calendar.current.isDate(lastDay, inSameDayAs: day) {
-            // Same day: earlier successes still stand.
-        } else {
+        // On the same day, earlier successes still stand.
+        if !(lastMatchesDay.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false) {
             lastMatchesBySlug = [:]
             lastMatchesDay = day
         }

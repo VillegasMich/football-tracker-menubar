@@ -13,7 +13,7 @@ extension MatchDataProvider {
     }
 }
 
-/// A provider left out a Competition it was asked for.
+/// The data source left out a Competition it was asked for.
 struct MissingOutcome: Error {
     let slug: String
 }
