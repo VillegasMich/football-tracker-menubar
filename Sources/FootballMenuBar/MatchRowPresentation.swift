@@ -40,7 +40,7 @@ struct MatchRowPresentation {
             if !match.isKickoffConfirmed {
                 // A nominal time the Primary Source hasn't confirmed: never
                 // shown as if it were exact.
-                badgeText = Match.unconfirmedKickoffLabel
+                badgeText = Match.toBeDecidedLabel
             } else if match.kickoff != .distantFuture {
                 let f = DateFormatter()
                 f.locale = locale

@@ -187,9 +187,23 @@ struct ESPNProviderTests {
         let match = try #require(matches.only)
         #expect(match.id == "401912254")
         #expect(match.home.name == "AS Roma")
-        #expect(match.away.name == "TBD Away")
         #expect(match.state == .upcoming)
         #expect(!match.isKickoffConfirmed)
+    }
+
+    @Test("A Match's single placeholder team shows as plain TBD, not the Primary Source's TBD Away")
+    func singlePlaceholderTeamIsTBD() async throws {
+        // Same EDITED fixture as above: AS Roma v the Primary Source's
+        // placeholder `TBD Away` (team id 131554, abbreviation `TBD Away`,
+        // empty logo).
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedTeams], on: localDay(2027, 2, 3))
+
+        let match = try #require(matches.only)
+        #expect(match.away == Team(id: "131554", name: "TBD", abbreviation: "TBD", logoURL: nil))
+        #expect(match.home == Team(id: "104", name: "AS Roma", abbreviation: "ROMA",
+                                   logoURL: URL(string: "https://a.espncdn.com/i/teamlogos/soccer/500/104.png")))
     }
 
     @Test("A kickoff the Primary Source has confirmed decodes as confirmed")

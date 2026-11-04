@@ -134,6 +134,20 @@ private struct Event: Decodable {
     /// while names are display text. The responses carry no placeholder flag.
     private static let placeholderTeamIDs: Set<String> = ["131556", "131554"]
 
+    /// Maps an ESPN team to the app's `Team`. A placeholder team keeps its id
+    /// but is named and abbreviated plain "TBD", with no logo, instead of the
+    /// Primary Source's `TBD Home` / `TBD Away`.
+    private static func team(from dto: Competition.Competitor.TeamDTO) -> Team {
+        if placeholderTeamIDs.contains(dto.id) {
+            return Team(id: dto.id, name: Match.toBeDecidedLabel,
+                        abbreviation: Match.toBeDecidedLabel, logoURL: nil)
+        }
+        return Team(id: dto.id,
+                    name: dto.displayName,
+                    abbreviation: dto.abbreviation ?? "",
+                    logoURL: dto.logo.flatMap(URL.init(string:)))
+    }
+
     /// Maps an ESPN event to the app's `Match`, or nil if it lacks the two
     /// competitors we require or both of its teams are placeholders. A Match
     /// with one placeholder team is kept, so a team's next Cup Match shows
@@ -149,14 +163,8 @@ private struct Event: Decodable {
             return nil
         }
 
-        let home = Team(id: homeC.team.id,
-                        name: homeC.team.displayName,
-                        abbreviation: homeC.team.abbreviation ?? "",
-                        logoURL: homeC.team.logo.flatMap(URL.init(string:)))
-        let away = Team(id: awayC.team.id,
-                        name: awayC.team.displayName,
-                        abbreviation: awayC.team.abbreviation ?? "",
-                        logoURL: awayC.team.logo.flatMap(URL.init(string:)))
+        let home = Self.team(from: homeC.team)
+        let away = Self.team(from: awayC.team)
         let score = Score(home: Int(homeC.score ?? "") ?? 0,
                           away: Int(awayC.score ?? "") ?? 0)
         // Read only from `shootoutScore`, never from `score`, so the Match

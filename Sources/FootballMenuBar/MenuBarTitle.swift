@@ -47,7 +47,7 @@ enum MenuBarTitle {
                        timeZone: TimeZone = .autoupdatingCurrent) -> String {
         switch match.state {
         case .upcoming:
-            guard match.isKickoffConfirmed else { return Match.unconfirmedKickoffLabel }
+            guard match.isKickoffConfirmed else { return Match.toBeDecidedLabel }
             // Short, locale-aware kickoff time, e.g. `7:00 PM`.
             let f = DateFormatter()
             f.locale = locale

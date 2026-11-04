@@ -22,9 +22,10 @@ struct Match: Codable, Identifiable, Hashable, Sendable {
     /// Carabao Cup quarter-final), shown to the user as "TBD".
     let isKickoffConfirmed: Bool
 
-    /// What the user sees in place of an unconfirmed kickoff time, in the
-    /// match row and the menu bar title.
-    static let unconfirmedKickoffLabel = "TBD"
+    /// What the user sees for something the Primary Source hasn't decided
+    /// yet: an unconfirmed kickoff time, or a placeholder team's name and
+    /// abbreviation.
+    static let toBeDecidedLabel = "TBD"
 
     var isLive: Bool { state == .inProgress }
 
