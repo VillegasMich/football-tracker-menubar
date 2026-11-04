@@ -10,12 +10,6 @@ struct MatchRowPresentation {
         case goals(home: String, away: String)
     }
 
-    /// One side of a Match.
-    enum Side: Equatable {
-        case home
-        case away
-    }
-
     /// Text of the status badge. For Upcoming Matches the Primary Source's
     /// detail is unreliable (often just a date), so the local kickoff time
     /// (e.g. `7:00 PM`) is shown instead when the kickoff is known.

@@ -109,6 +109,37 @@ struct ESPNProviderTests {
         #expect(match.statusDetail == "AET")
     }
 
+    @Test("A Match decided by a Penalty Shootout keeps its Match score and carries the shootout result apart")
+    func penaltyShootoutMatch() async throws {
+        // Champions League final, 30 May 2026: Paris Saint-Germain 1–1
+        // Arsenal after extra time, Paris Saint-Germain win 4–3 on penalties
+        // (`STATUS_FINAL_PEN`, shortDetail `FT-Pens`, `shootoutScore` 4 and 3).
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [championsLeague], on: localDay(2026, 5, 30))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401862897")
+        #expect(match.home.name == "Paris Saint-Germain")
+        #expect(match.away.name == "Arsenal")
+        #expect(match.state == .finished)
+        #expect(match.score == Score(home: 1, away: 1))
+        #expect(match.penaltyShootout == PenaltyShootout(home: 4, away: 3))
+        #expect(match.penaltyShootout?.winner == .home)
+    }
+
+    @Test("A Match that went to extra time without penalties has no Penalty Shootout result")
+    func extraTimeMatchHasNoPenaltyShootout() async throws {
+        // FA Cup qualifying, 11 Aug 2026: Worcester Raiders at Ashby Ivanhoe,
+        // 3–1 after extra time, no `shootoutScore` on either competitor.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [faCupQualifying], on: localDay(2026, 8, 11))
+
+        let match = try #require(matches.first { $0.id == "401906755" })
+        #expect(match.penaltyShootout == nil)
+    }
+
     @Test("A Match with an unrecognised status name is kept and decodes as Upcoming, not Finished")
     func unrecognisedStatusName() async throws {
         // EDITED fixture, not a verbatim response: the real Postponed Match
@@ -129,6 +160,7 @@ struct ESPNProviderTests {
 private let premierLeague = League(slug: "eng.1", displayName: "Premier League")
 private let faCupQualifying = League(slug: "eng.fa_qual", displayName: "FA Cup Qualifying")
 private let peruLiga1 = League(slug: "per.1", displayName: "Liga 1 (Peru)")
+private let championsLeague = League(slug: "uefa.champions", displayName: "Champions League")
 private let nationalLeague = League(slug: "eng.5", displayName: "National League")
 /// Test-only slug serving fixtures edited from real responses.
 private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")

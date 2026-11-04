@@ -101,7 +101,13 @@ private struct Event: Decodable {
         let competitors: [Competitor]
         struct Competitor: Decodable {
             let homeAway: String
+            /// Goals in play. Stays level through a Penalty Shootout: the
+            /// kicks are reported only in `shootoutScore`.
             let score: String?
+            /// Penalty Shootout kicks scored, present only on Matches that
+            /// went to one. A number (e.g. `4`, or `4.0` in other ESPN
+            /// endpoints), so `Double` accepts both forms.
+            let shootoutScore: Double?
             let team: TeamDTO
             struct TeamDTO: Decodable {
                 let id: String
@@ -135,6 +141,13 @@ private struct Event: Decodable {
                         logoURL: awayC.team.logo.flatMap(URL.init(string:)))
         let score = Score(home: Int(homeC.score ?? "") ?? 0,
                           away: Int(awayC.score ?? "") ?? 0)
+        // Read only from `shootoutScore`, never from `score`, so the Match
+        // score (and with it "Goal" notifications) ignores shootout kicks.
+        let penaltyShootout = homeC.shootoutScore.flatMap { homeKicks in
+            awayC.shootoutScore.map { awayKicks in
+                PenaltyShootout(home: Int(homeKicks), away: Int(awayKicks))
+            }
+        }
 
         return Match(
             id: id,
@@ -142,6 +155,7 @@ private struct Event: Decodable {
             home: home,
             away: away,
             score: score,
+            penaltyShootout: penaltyShootout,
             state: MatchState(espnName: status.type.name,
                               state: status.type.state,
                               completed: status.type.completed),

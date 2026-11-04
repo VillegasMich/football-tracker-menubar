@@ -7,6 +7,7 @@ import Foundation
 func makeMatch(state: MatchState,
                statusDetail: String,
                score: Score = Score(home: 0, away: 0),
+               penaltyShootout: PenaltyShootout? = nil,
                kickoff: Date = utc("2026-11-01T19:00Z"),
                home: Team = Team(id: "359", name: "Arsenal", abbreviation: "ARS", logoURL: nil),
                away: Team = Team(id: "363", name: "Chelsea", abbreviation: "CHE", logoURL: nil)) -> Match {
@@ -15,6 +16,7 @@ func makeMatch(state: MatchState,
           home: home,
           away: away,
           score: score,
+          penaltyShootout: penaltyShootout,
           state: state,
           statusDetail: statusDetail,
           kickoff: kickoff)
