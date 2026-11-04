@@ -49,6 +49,29 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.text(for: match) == "ARS 1 – 0 CHE (Abd)")
     }
 
+    @Test("A Match decided by a Penalty Shootout shows the Match score, then the shootout result after the away abbreviation")
+    func penaltyShootoutShowsScoreAndResult() {
+        // The 2026 Champions League final: Paris Saint-Germain 1–1 Arsenal,
+        // Paris Saint-Germain won the Penalty Shootout 4–3.
+        let match = makeMatch(state: .finished, statusDetail: "FT-Pens",
+                              score: Score(home: 1, away: 1),
+                              penaltyShootout: PenaltyShootout(home: 4, away: 3),
+                              home: paris, away: arsenal)
+
+        #expect(MenuBarTitle.text(for: match) == "PSG 1 – 1 ARS (4–3p)")
+    }
+
+    @Test("The logo-mode title shows a Penalty Shootout Match's score, then the shootout result after the away team")
+    func logoModePenaltyShootout() {
+        let match = makeMatch(state: .finished, statusDetail: "FT-Pens",
+                              score: Score(home: 1, away: 1),
+                              penaltyShootout: PenaltyShootout(home: 4, away: 3),
+                              home: paris, away: arsenal)
+
+        #expect(MenuBarTitle.middle(for: match) == "1 – 1")
+        #expect(MenuBarTitle.suffix(for: match) == "(4–3p)")
+    }
+
     @Test("Abbreviation overrides replace the Primary Source's abbreviations, uppercased")
     func abbreviationOverrides() {
         let match = makeMatch(state: .finished, statusDetail: "FT", score: Score(home: 2, away: 3))
@@ -88,7 +111,7 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.suffix(for: match) == "(Abd)")
     }
 
-    @Test("Only an Abandoned Match has a title suffix",
+    @Test("Without a Penalty Shootout, only an Abandoned Match has a title suffix",
           arguments: [MatchState.upcoming, .inProgress, .finished, .postponed, .cancelled])
     func noSuffixOtherwise(state: MatchState) {
         let match = makeMatch(state: state, statusDetail: "")

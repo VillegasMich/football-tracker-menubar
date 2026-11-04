@@ -10,12 +10,6 @@ struct MatchRowPresentation {
         case goals(home: String, away: String)
     }
 
-    /// One side of a Match.
-    enum Side: Equatable {
-        case home
-        case away
-    }
-
     /// Text of the status badge. For Upcoming Matches the Primary Source's
     /// detail is unreliable (often just a date), so the local kickoff time
     /// (e.g. `7:00 PM`) is shown instead when the kickoff is known.
@@ -24,8 +18,8 @@ struct MatchRowPresentation {
     let isLiveStyle: Bool
     /// The score column.
     let score: ScoreText
-    /// The team shown with emphasis, if any. Always `nil` for now; a Penalty
-    /// Shootout winner will use it (#7).
+    /// The team shown with emphasis, if any: the winner of a Finished Match's
+    /// Penalty Shootout. `nil` for every other Match.
     let emphasisedTeam: Side?
     /// Whether the row offers the highlights button.
     let offersHighlights: Bool
@@ -37,8 +31,8 @@ struct MatchRowPresentation {
          locale: Locale = .autoupdatingCurrent,
          timeZone: TimeZone = .autoupdatingCurrent) {
         isLiveStyle = match.isLive
-        emphasisedTeam = nil
         offersHighlights = match.state == .finished
+        emphasisedTeam = match.decidingPenaltyShootout?.winner
         switch match.state {
         case .upcoming:
             score = .dash
@@ -53,9 +47,12 @@ struct MatchRowPresentation {
             }
         case .inProgress, .finished, .abandoned:
             // An Abandoned Match keeps the score from when play stopped, with
-            // our own word as its badge.
+            // our own word as its badge. A Match decided by a Penalty Shootout
+            // shows the shootout result (e.g. "4–3 pens") instead of the
+            // Primary Source's "FT-Pens".
             score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-            badgeText = match.state.statusWord ?? match.statusDetail
+            badgeText = match.decidingPenaltyShootout.map { "\($0.display) pens" }
+                ?? match.state.statusWord ?? match.statusDetail
         case .postponed, .cancelled:
             // Never played, so no score; our own word, not the Primary Source's.
             score = .dash

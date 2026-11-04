@@ -8,13 +8,23 @@ struct Match: Codable, Identifiable, Hashable, Sendable {
     let leagueSlug: String
     let home: Team
     let away: Team
+    /// Goals scored in play, extra time included. Never changed by Penalty
+    /// Shootout kicks.
     let score: Score
+    /// The Penalty Shootout result, if the Match went to one; `nil` otherwise.
+    let penaltyShootout: PenaltyShootout?
     let state: MatchState
     /// ESPN's short status text, e.g. `"37'"`, `"FT"`, or a kickoff time.
     let statusDetail: String
     let kickoff: Date
 
     var isLive: Bool { state == .inProgress }
+
+    /// The Penalty Shootout that decided this Match, once it is Finished;
+    /// `nil` before then and for every Match without one.
+    var decidingPenaltyShootout: PenaltyShootout? {
+        state == .finished ? penaltyShootout : nil
+    }
 
     /// A YouTube search URL for this fixture's highlights, e.g.
     /// `https://www.youtube.com/results?search_query=Everton%20vs%20Fulham%20highlights`.

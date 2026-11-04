@@ -10,6 +10,7 @@ enum MenuBarTitle {
     /// - upcoming: `"ARS 7:00 PM CHE"` (abbreviations + kickoff time)
     /// - postponed / cancelled: `"ARS Postponed CHE"`, `"ARS Cancelled CHE"`
     /// - abandoned: `"ARS 1 – 0 CHE (Abd)"` (score from when play stopped)
+    /// - finished after a Penalty Shootout: `"PSG 1 – 1 ARS (4–3p)"`
     ///
     /// `abbreviation` resolves each team's displayed abbreviation, so callers can
     /// route it through the per-team overrides. Defaults to the team's own
@@ -28,9 +29,12 @@ enum MenuBarTitle {
     }
 
     /// The segment after the away team, shared by the text title and the
-    /// logo-mode title: `"(Abd)"` for an Abandoned Match, `nil` otherwise.
+    /// logo-mode title: `"(Abd)"` for an Abandoned Match, the Penalty
+    /// Shootout result in home–away order (e.g. `"(4–3p)"`) for a Finished
+    /// Match decided by one, `nil` otherwise.
     static func suffix(for match: Match) -> String? {
-        match.state == .abandoned ? "(Abd)" : nil
+        if match.state == .abandoned { return "(Abd)" }
+        return match.decidingPenaltyShootout.map { "(\($0.display)p)" }
     }
 
     /// The state-dependent middle segment shared by the text title and the
