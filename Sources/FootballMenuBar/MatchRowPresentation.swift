@@ -39,17 +39,25 @@ struct MatchRowPresentation {
         isLiveStyle = match.isLive
         emphasisedTeam = nil
         offersHighlights = match.state == .finished
-        score = match.state == .upcoming
-            ? .dash
-            : .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-        if match.state == .upcoming, match.kickoff != .distantFuture {
-            let f = DateFormatter()
-            f.locale = locale
-            f.timeZone = timeZone
-            f.setLocalizedDateFormatFromTemplate("j mm")
-            badgeText = f.string(from: match.kickoff)
-        } else {
+        switch match.state {
+        case .upcoming:
+            score = .dash
+            if match.kickoff != .distantFuture {
+                let f = DateFormatter()
+                f.locale = locale
+                f.timeZone = timeZone
+                f.setLocalizedDateFormatFromTemplate("j mm")
+                badgeText = f.string(from: match.kickoff)
+            } else {
+                badgeText = match.statusDetail
+            }
+        case .inProgress, .finished:
+            score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
             badgeText = match.statusDetail
+        case .postponed, .cancelled:
+            // Never played, so no score; our own word, not the Primary Source's.
+            score = .dash
+            badgeText = match.state.unplayedStatusWord ?? match.statusDetail
         }
     }
 }

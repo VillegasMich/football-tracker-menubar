@@ -77,6 +77,24 @@ struct MatchRowPresentationTests {
         #expect(row.offersHighlights == offersHighlights)
     }
 
+    @Test("Postponed and Cancelled Matches show the status word as badge and a dash, with no highlights and not in the Live style",
+          arguments: [
+              // The Primary Source's own short details, as seen in real responses.
+              (MatchState.postponed, "Postponed", "Postponed"),
+              (.cancelled, "Canceled", "Cancelled"),
+          ])
+    func postponedAndCancelled(state: MatchState, primarySourceDetail: String, badge: String) {
+        let match = makeMatch(state: state, statusDetail: primarySourceDetail,
+                              score: Score(home: 0, away: 0))
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == badge)
+        #expect(row.score == .dash)
+        #expect(!row.offersHighlights)
+        #expect(!row.isLiveStyle)
+    }
+
     @Test("No team is emphasised", arguments: [MatchState.upcoming, .inProgress, .finished])
     func noTeamEmphasised(state: MatchState) {
         let match = makeMatch(state: state, statusDetail: "", score: Score(home: 3, away: 0))
