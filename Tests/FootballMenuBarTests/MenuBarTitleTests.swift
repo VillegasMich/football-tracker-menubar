@@ -25,6 +25,19 @@ struct MenuBarTitleTests {
         #expect(title == "LIV TBD BOU")
     }
 
+    @Test("A Match with one placeholder team and an unconfirmed kickoff shows TBD for both the kickoff and that team")
+    func onePlaceholderTeamUnconfirmed() {
+        // AS Roma v a placeholder team, as decoding gives it: plain "TBD",
+        // keeping the Primary Source's placeholder id 131554.
+        let placeholder = Team(id: "131554", name: "TBD", abbreviation: "TBD", logoURL: nil)
+        let roma = Team(id: "104", name: "AS Roma", abbreviation: "ROMA", logoURL: nil)
+        let match = makeMatch(state: .upcoming, statusDetail: "TBD",
+                              kickoff: utc("2027-02-03T20:00Z"), isKickoffConfirmed: false,
+                              home: roma, away: placeholder)
+
+        #expect(MenuBarTitle.text(for: match, locale: britishEnglish, timeZone: madrid) == "ROMA TBD TBD")
+    }
+
     @Test("The logo-mode title shows TBD for an Upcoming Match with an unconfirmed kickoff, with no suffix")
     func logoModeUpcomingUnconfirmed() {
         let match = unconfirmedCarabaoQuarterFinal
