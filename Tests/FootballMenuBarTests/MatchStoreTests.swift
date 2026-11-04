@@ -91,6 +91,21 @@ final class MatchStoreTests {
         #expect(!settings.isFollowed(laLiga))
     }
 
+    @Test("Following a Competition refreshes the browsed day straight away, including it")
+    func followingRefreshes() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        provider.succeed(laLiga, with: [barcelonaRealMadrid])
+        await store.loadInitial()
+
+        store.settings.follow(laLiga)
+        await store.followedCompetitionsRefresh?.value
+
+        #expect(provider.requestedSlugs.last == ["eng.1", "esp.1", "uefa.champions"])
+        #expect(store.matchesByCompetition.map(\.competition) == [premierLeague, laLiga])
+        #expect(store.matchesByCompetition.map(\.matches) == [[arsenalChelsea], [barcelonaRealMadrid]])
+    }
+
     // MARK: - A Competition that fails
 
     @Test("A failed Competition keeps its last Matches and is marked stale, while the others update")
@@ -308,6 +323,12 @@ private var parisBayern: Match {
     makeMatch(id: "2", competitionSlug: "uefa.champions", state: .upcoming,
               statusDetail: "8:00 PM", kickoff: todayKickoff,
               home: paris, away: bayern)
+}
+private var barcelonaRealMadrid: Match {
+    makeMatch(id: "4", competitionSlug: "esp.1", state: .upcoming,
+              statusDetail: "8:00 PM", kickoff: todayKickoff,
+              home: Team(id: "83", name: "Barcelona", abbreviation: "BAR", logoURL: nil),
+              away: Team(id: "86", name: "Real Madrid", abbreviation: "RMA", logoURL: nil))
 }
 private var parisBayernLive: Match {
     makeMatch(id: "2", competitionSlug: "uefa.champions", state: .inProgress,

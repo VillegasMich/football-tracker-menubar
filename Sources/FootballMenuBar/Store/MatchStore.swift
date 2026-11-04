@@ -73,6 +73,13 @@ final class MatchStore: ObservableObject {
     /// Posts pinned-match notifications. Optional so tests/previews can omit it.
     private let notifier: MatchNotifier?
     private var pollingTask: Task<Void, Never>?
+    private var followedCompetitionsSubscription: AnyCancellable?
+    /// The refresh started by the latest change of the Followed Competitions;
+    /// awaitable so tests can wait for it.
+    private(set) var followedCompetitionsRefresh: Task<Void, Never>?
+    /// Set when the Followed Competitions change during a refresh, so that
+    /// refresh runs once more with them instead of the change being dropped.
+    private var refreshPending = false
 
     /// Distinguishes a snapshot write that reflects live observation (a poll
     /// tick, which may notify) from one that merely seeds the pinned match (pin,
@@ -91,6 +98,31 @@ final class MatchStore: ObservableObject {
         self.pinnedMatchID = defaults.string(forKey: Self.pinnedMatchIDKey)
         if let dayString = defaults.string(forKey: Self.pinnedMatchDayKey) {
             self.pinnedMatchDay = Self.dayKeyFormatter.date(from: dayString)
+        }
+        // `@Published` emits before the property changes, so the new value is
+        // taken from the emission. Settings change on the main actor.
+        followedCompetitionsSubscription = settings.$followedCompetitions
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] followed in
+                MainActor.assumeIsolated { self?.followedCompetitionsChanged(to: followed) }
+            }
+    }
+
+    // MARK: - Followed Competitions
+
+    /// Follow a new selection: an unfollowed Competition's Matches and status
+    /// leave the list at once, and the browsed day is refreshed straight away
+    /// so a newly followed Competition's Matches appear.
+    private func followedCompetitionsChanged(to followed: [Competition]) {
+        competitions = followed
+        let followedSlugs = Set(followed.map(\.slug))
+        lastMatchesBySlug = lastMatchesBySlug.filter { followedSlugs.contains($0.key) }
+        loadStatusBySlug = loadStatusBySlug.filter { followedSlugs.contains($0.key) }
+        matches = followed.flatMap { lastMatchesBySlug[$0.slug] ?? [] }
+        followedCompetitionsRefresh = Task { [weak self] in
+            guard let self else { return }
+            if self.isRefreshing { self.refreshPending = true } else { await self.refresh() }
         }
     }
 
@@ -276,15 +308,19 @@ final class MatchStore: ObservableObject {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        await loadBrowse(for: selectedDate)
+        repeat {
+            refreshPending = false
+            await loadBrowse(for: selectedDate)
+        } while refreshPending
     }
 
     /// Load the browse feed for `target`. Results are discarded if the selected
     /// day changed while the fetch was in flight (out-of-order guard).
     private func loadBrowse(for target: Date) async {
-        let results = await provider.matches(for: competitions, on: target)
+        let requested = competitions
+        let results = await provider.matches(for: requested, on: target)
         guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
-        applyBrowseResults(results, for: target)
+        applyBrowseResults(results, requested: requested, for: target)
         updateSnapshotFromBrowse(results)
         hasLoadedOnce = true
     }
@@ -293,16 +329,22 @@ final class MatchStore: ObservableObject {
     /// succeeded shows its new Matches. One that failed keeps the Matches of
     /// its last success that day (stale), or, with no success that day yet,
     /// is marked failed to load. A new day starts with no last Matches.
-    private func applyBrowseResults(_ results: CompetitionResults, for day: Date) {
-        // On the same day, earlier successes still stand.
-        if !(lastMatchesDay.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false) {
+    ///
+    /// Only the `requested` Competitions that are still followed are merged:
+    /// the selection may have changed while the fetch was in flight, and a
+    /// Competition followed since then keeps its state until its own fetch.
+    private func applyBrowseResults(_ results: CompetitionResults, requested: [Competition], for day: Date) {
+        // On the same day, earlier successes and statuses still stand.
+        let isSameDay = lastMatchesDay.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false
+        if !isSameDay {
             lastMatchesBySlug = [:]
             lastMatchesDay = day
         }
 
-        var statuses: [String: CompetitionLoadStatus] = [:]
+        let followedSlugs = Set(competitions.map(\.slug))
+        var statuses = isSameDay ? loadStatusBySlug : [:]
         var firstFailure: MatchDataError?
-        for competition in competitions {
+        for competition in requested where followedSlugs.contains(competition.slug) {
             let slug = competition.slug
             if case .success(let fetched)? = results[slug] {
                 lastMatchesBySlug[slug] = fetched
@@ -317,7 +359,7 @@ final class MatchStore: ObservableObject {
 
         matches = competitions.flatMap { lastMatchesBySlug[$0.slug] ?? [] }
         loadStatusBySlug = statuses
-        let everyCompetitionFailed = !competitions.isEmpty && !statuses.values.contains(.loaded)
+        let everyCompetitionFailed = !statuses.isEmpty && !statuses.values.contains(.loaded)
         errorMessage = everyCompetitionFailed && matches.isEmpty ? Self.describe(firstFailure) : nil
     }
 
