@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Observable store that keeps matches current for the supported Competitions and
+/// Observable store that keeps matches current for the Followed Competitions and
 /// auto-refreshes on a cadence driven by live play. Injected into the SwiftUI
 /// environment for views to read.
 ///
@@ -196,7 +196,7 @@ final class MatchStore: ObservableObject {
     /// rather than flashing empty the moment `selectedDate` changes.
     var visibleMatches: [Match] { matches }
 
-    /// Matches grouped by Competition in the supported-Competition order, with
+    /// Matches grouped by Competition in catalogue order, with
     /// each Competition's load status, for display. A Competition with no
     /// Matches is left out unless it failed to load, so the list can say so.
     var matchesByCompetition: [(competition: Competition, status: CompetitionLoadStatus, matches: [Match])] {

@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The app's global configuration window (the standard `Settings` scene):
-/// refresh cadence and the menu bar live-indicator options. Team abbreviation
-/// overrides are edited contextually from the popover rows, not here.
+/// The app's global configuration window (the standard `Settings` scene): the
+/// Followed Competitions, refresh cadence and the menu bar live-indicator
+/// options. Team abbreviation overrides are edited contextually from the
+/// popover rows, not here.
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: MatchStore
@@ -10,6 +11,19 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Competitions") {
+                Text("Following \(settings.followedCompetitions.count)")
+                    .foregroundStyle(.secondary)
+                ForEach(Competition.Region.allCases, id: \.self) { region in
+                    // Collapsed by default, so the window stays small.
+                    DisclosureGroup(region.displayName) {
+                        ForEach(Competition.catalogue.filter { $0.region == region }) { competition in
+                            CompetitionToggle(competition: competition)
+                        }
+                    }
+                }
+            }
+
             Section("Startup") {
                 Toggle("Open at login", isOn: Binding(
                     get: { launchAtLogin.state.isOn },
@@ -95,6 +109,20 @@ struct SettingsView: View {
         let live = settings.cadence.liveInterval / 1_000_000_000
         let idleMinutes = settings.cadence.idleInterval / 60_000_000_000
         return "Live matches: every \(live)s · Otherwise: every \(idleMinutes) min"
+    }
+}
+
+/// Follows or unfollows one Competition. Disabled for the last Followed
+/// Competition, which can't be unfollowed.
+private struct CompetitionToggle: View {
+    @EnvironmentObject private var settings: AppSettings
+    let competition: Competition
+
+    var body: some View {
+        Toggle(competition.displayName, isOn: Binding(
+            get: { settings.isFollowed(competition) },
+            set: { $0 ? settings.follow(competition) : settings.unfollow(competition) }))
+            .disabled(!settings.canUnfollow(competition))
     }
 }
 
