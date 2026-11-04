@@ -78,7 +78,7 @@ final class MatchStore: ObservableObject {
     private enum SnapshotSource { case seed, poll }
 
     init(provider: MatchDataProvider,
-         competitions: [Competition] = Competition.supported,
+         competitions: [Competition] = Competition.defaultFollowed,
          defaults: UserDefaults = .standard,
          settings: AppSettings = AppSettings(),
          notifier: MatchNotifier? = nil) {

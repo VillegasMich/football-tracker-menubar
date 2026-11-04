@@ -216,8 +216,8 @@ final class MatchStoreTests {
     }
 }
 
-private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League")
-private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League")
+private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League", region: .england)
+private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
 /// each use, so it is today for whichever test reads it.

@@ -283,19 +283,19 @@ struct ESPNProviderTests {
     }
 }
 
-private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League")
-private let faCupQualifying = Competition(slug: "eng.fa_qual", displayName: "FA Cup Qualifying")
-private let peruLiga1 = Competition(slug: "per.1", displayName: "Liga 1 (Peru)")
-private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League")
-private let nationalLeague = Competition(slug: "eng.5", displayName: "National League")
-private let carabaoCup = Competition(slug: "eng.league_cup", displayName: "Carabao Cup")
-private let coppaItalia = Competition(slug: "ita.coppa_italia", displayName: "Coppa Italia")
+private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League", region: .england)
+private let faCupQualifying = Competition(slug: "eng.fa_qual", displayName: "FA Cup Qualifying", region: .england)
+private let peruLiga1 = Competition(slug: "per.1", displayName: "Liga 1 (Peru)", region: .restOfTheWorld)
+private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
+private let nationalLeague = Competition(slug: "eng.5", displayName: "National League", region: .england)
+private let carabaoCup = Competition(slug: "eng.league_cup", displayName: "Carabao Cup", region: .england)
+private let coppaItalia = Competition(slug: "ita.coppa_italia", displayName: "Coppa Italia", region: .italy)
 /// Test-only slug serving fixtures edited from real responses.
-private let editedStatus = Competition(slug: "test.edited-status", displayName: "Edited status (test only)")
+private let editedStatus = Competition(slug: "test.edited-status", displayName: "Edited status (test only)", region: .restOfTheWorld)
 /// Test-only slug serving a real response with one placeholder team replaced.
-private let editedTeams = Competition(slug: "test.edited-teams", displayName: "Edited teams (test only)")
+private let editedTeams = Competition(slug: "test.edited-teams", displayName: "Edited teams (test only)", region: .restOfTheWorld)
 /// Test-only slug serving a real response with its `timeValid` flag removed.
-private let editedKickoff = Competition(slug: "test.edited-kickoff", displayName: "Edited kickoff (test only)")
+private let editedKickoff = Competition(slug: "test.edited-kickoff", displayName: "Edited kickoff (test only)", region: .restOfTheWorld)
 
 fileprivate extension Array {
     /// The single element, or `nil` when there are zero or several.
