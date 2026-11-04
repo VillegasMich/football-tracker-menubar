@@ -21,10 +21,11 @@ final class MatchStoreTests {
 
     /// A store following the Premier League and the Champions League.
     private func makeStore() -> MatchStore {
-        defaults.set([premierLeague.slug, championsLeague.slug], forKey: "settings.followedCompetitions")
+        let settings = AppSettings(defaults: defaults)
+        settings.unfollow(worldCup)
         return MatchStore(provider: provider,
                           defaults: defaults,
-                          settings: AppSettings(defaults: defaults),
+                          settings: settings,
                           notifier: nil)
     }
 
@@ -40,6 +41,32 @@ final class MatchStoreTests {
         #expect(store.settings.followedCompetitions.map(\.displayName)
                 == ["Premier League", "Champions League", "World Cup"])
         #expect(provider.requestedSlugs == [["eng.1", "uefa.champions", "fifa.world"]])
+    }
+
+    @Test("Following and unfollowing persists across launches")
+    func followingPersists() {
+        let settings = AppSettings(defaults: defaults)
+
+        settings.follow(laLiga)
+        settings.unfollow(worldCup)
+
+        #expect(AppSettings(defaults: defaults).followedCompetitions.map(\.displayName)
+                == ["Premier League", "LaLiga", "Champions League"])
+    }
+
+    @Test("Unknown stored slugs are ignored")
+    func unknownSlugsIgnored() {
+        defaults.set(["eng.fa_qual", "esp.1", "gone.1"], forKey: followedCompetitionsKey)
+
+        #expect(AppSettings(defaults: defaults).followedCompetitions == [laLiga])
+    }
+
+    @Test("The defaults apply when no stored slug is valid")
+    func defaultsWhenNothingValid() {
+        defaults.set(["gone.1"], forKey: followedCompetitionsKey)
+
+        #expect(AppSettings(defaults: defaults).followedCompetitions.map(\.displayName)
+                == ["Premier League", "Champions League", "World Cup"])
     }
 
     // MARK: - A Competition that fails
@@ -231,8 +258,13 @@ final class MatchStoreTests {
     }
 }
 
+/// Where the settings store the Followed Competitions' slugs.
+private let followedCompetitionsKey = "settings.followedCompetitions"
+
 private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League", region: .england)
 private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
+private let laLiga = Competition(slug: "esp.1", displayName: "LaLiga", region: .spain)
+private let worldCup = Competition(slug: "fifa.world", displayName: "World Cup", region: .fifa)
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
 /// each use, so it is today for whichever test reads it.

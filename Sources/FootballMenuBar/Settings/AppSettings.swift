@@ -25,7 +25,9 @@ final class AppSettings: ObservableObject {
 
     /// The Competitions the user follows, in catalogue order. Persisted as
     /// their slugs.
-    @Published private(set) var followedCompetitions: [Competition]
+    @Published private(set) var followedCompetitions: [Competition] {
+        didSet { defaults.set(followedCompetitions.map(\.slug), forKey: Key.followedCompetitions) }
+    }
 
     /// Selected refresh cadence preset. Persisted by raw string; an unknown
     /// persisted value falls back to the default.
@@ -108,6 +110,22 @@ final class AppSettings: ObservableObject {
         let followedSlugs = Set(defaults.stringArray(forKey: Key.followedCompetitions) ?? [])
         let followed = Competition.catalogue.filter { followedSlugs.contains($0.slug) }
         self.followedCompetitions = followed.isEmpty ? Competition.defaultFollowed : followed
+    }
+
+    // MARK: - Followed Competitions
+
+    /// Follow `competition`, keeping the list in catalogue order.
+    func follow(_ competition: Competition) {
+        setFollowed(followedCompetitions + [competition])
+    }
+
+    /// Stop following `competition`.
+    func unfollow(_ competition: Competition) {
+        setFollowed(followedCompetitions.filter { $0 != competition })
+    }
+
+    private func setFollowed(_ competitions: [Competition]) {
+        followedCompetitions = Competition.catalogue.filter(competitions.contains)
     }
 
     // MARK: - Abbreviation overrides
