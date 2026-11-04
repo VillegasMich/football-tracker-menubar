@@ -33,14 +33,8 @@ enum MenuBarTitle {
     /// Shootout result in home–away order (e.g. `"(4–3p)"`) for a Finished
     /// Match decided by one, `nil` otherwise.
     static func suffix(for match: Match) -> String? {
-        switch match.state {
-        case .abandoned:
-            return "(Abd)"
-        case .finished:
-            return match.penaltyShootout.map { "(\($0.home)–\($0.away)p)" }
-        case .upcoming, .inProgress, .postponed, .cancelled:
-            return nil
-        }
+        if match.state == .abandoned { return "(Abd)" }
+        return match.decidingPenaltyShootout.map { "(\($0.display)p)" }
     }
 
     /// The state-dependent middle segment shared by the text title and the

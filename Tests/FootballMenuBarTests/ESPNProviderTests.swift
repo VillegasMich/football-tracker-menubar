@@ -112,7 +112,7 @@ struct ESPNProviderTests {
     @Test("A Match decided by a Penalty Shootout keeps its Match score and carries the shootout result apart")
     func penaltyShootoutMatch() async throws {
         // Champions League final, 30 May 2026: Paris Saint-Germain 1–1
-        // Arsenal after extra time, Paris Saint-Germain win 4–3 on penalties
+        // Arsenal after extra time, Paris Saint-Germain won the Penalty Shootout 4–3
         // (`STATUS_FINAL_PEN`, shortDetail `FT-Pens`, `shootoutScore` 4 and 3).
         let provider = ESPNProvider(session: .espnFixtures)
 
@@ -128,7 +128,7 @@ struct ESPNProviderTests {
         #expect(match.penaltyShootout?.winner == .home)
     }
 
-    @Test("A Match that went to extra time without penalties has no Penalty Shootout result")
+    @Test("A Match that went to extra time without a Penalty Shootout has no Penalty Shootout result")
     func extraTimeMatchHasNoPenaltyShootout() async throws {
         // FA Cup qualifying, 11 Aug 2026: Worcester Raiders at Ashby Ivanhoe,
         // 3–1 after extra time, no `shootoutScore` on either competitor.

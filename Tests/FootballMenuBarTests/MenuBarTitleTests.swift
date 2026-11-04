@@ -52,7 +52,7 @@ struct MenuBarTitleTests {
     @Test("A Match decided by a Penalty Shootout shows the Match score, then the shootout result after the away abbreviation")
     func penaltyShootoutShowsScoreAndResult() {
         // The 2026 Champions League final: Paris Saint-Germain 1–1 Arsenal,
-        // Paris Saint-Germain win 4–3 on penalties.
+        // Paris Saint-Germain won the Penalty Shootout 4–3.
         let match = makeMatch(state: .finished, statusDetail: "FT-Pens",
                               score: Score(home: 1, away: 1),
                               penaltyShootout: PenaltyShootout(home: 4, away: 3),

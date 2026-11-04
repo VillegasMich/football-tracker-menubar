@@ -20,6 +20,12 @@ struct Match: Codable, Identifiable, Hashable, Sendable {
 
     var isLive: Bool { state == .inProgress }
 
+    /// The Penalty Shootout that decided this Match, once it is Finished;
+    /// `nil` before then and for every Match without one.
+    var decidingPenaltyShootout: PenaltyShootout? {
+        state == .finished ? penaltyShootout : nil
+    }
+
     /// A YouTube search URL for this fixture's highlights, e.g.
     /// `https://www.youtube.com/results?search_query=Everton%20vs%20Fulham%20highlights`.
     /// Built with `URLComponents`/`URLQueryItem` so spaces and non-ASCII club

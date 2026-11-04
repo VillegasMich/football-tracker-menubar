@@ -32,16 +32,7 @@ struct MatchRowPresentation {
          timeZone: TimeZone = .autoupdatingCurrent) {
         isLiveStyle = match.isLive
         offersHighlights = match.state == .finished
-        // A Finished Match decided by a Penalty Shootout: the shootout result
-        // in home–away order (e.g. "4–3 pens") replaces the Primary Source's
-        // "FT-Pens", and the winner is emphasised.
-        if match.state == .finished, let shootout = match.penaltyShootout {
-            score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-            badgeText = "\(shootout.home)–\(shootout.away) pens"
-            emphasisedTeam = shootout.winner
-            return
-        }
-        emphasisedTeam = nil
+        emphasisedTeam = match.decidingPenaltyShootout?.winner
         switch match.state {
         case .upcoming:
             score = .dash
@@ -56,9 +47,12 @@ struct MatchRowPresentation {
             }
         case .inProgress, .finished, .abandoned:
             // An Abandoned Match keeps the score from when play stopped, with
-            // our own word as its badge.
+            // our own word as its badge. A Match decided by a Penalty Shootout
+            // shows the shootout result (e.g. "4–3 pens") instead of the
+            // Primary Source's "FT-Pens".
             score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
-            badgeText = match.state.statusWord ?? match.statusDetail
+            badgeText = match.decidingPenaltyShootout.map { "\($0.display) pens" }
+                ?? match.state.statusWord ?? match.statusDetail
         case .postponed, .cancelled:
             // Never played, so no score; our own word, not the Primary Source's.
             score = .dash
