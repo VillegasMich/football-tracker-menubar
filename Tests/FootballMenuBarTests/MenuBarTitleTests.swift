@@ -17,6 +17,22 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.text(for: match, locale: britishEnglish, timeZone: madrid) == "ARS 20:00 CHE")
     }
 
+    @Test("An Upcoming Match with an unconfirmed kickoff shows TBD between the abbreviations")
+    func upcomingUnconfirmedShowsTBD() {
+        let title = MenuBarTitle.text(for: unconfirmedCarabaoQuarterFinal,
+                                      locale: britishEnglish, timeZone: madrid)
+
+        #expect(title == "LIV TBD BOU")
+    }
+
+    @Test("The logo-mode title shows TBD for an Upcoming Match with an unconfirmed kickoff, with no suffix")
+    func logoModeUpcomingUnconfirmed() {
+        let match = unconfirmedCarabaoQuarterFinal
+
+        #expect(MenuBarTitle.middle(for: match, locale: britishEnglish, timeZone: madrid) == "TBD")
+        #expect(MenuBarTitle.suffix(for: match) == nil)
+    }
+
     @Test("A Live Match shows the Match score between the abbreviations")
     func liveShowsScore() {
         let match = makeMatch(state: .inProgress, statusDetail: "63'", score: Score(home: 1, away: 0))
