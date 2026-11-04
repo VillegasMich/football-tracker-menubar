@@ -1,10 +1,12 @@
 import Foundation
 @testable import FootballMenuBar
 
-/// Builds Matches for presentation tests. The defaults are an ordinary
-/// Premier League Match between Arsenal and Chelsea; each test overrides only
-/// what it cares about.
-func makeMatch(state: MatchState,
+/// Builds Matches for presentation and store tests. The defaults are an
+/// ordinary Premier League Match between Arsenal and Chelsea; each test
+/// overrides only what it cares about.
+func makeMatch(id: String = "740001",
+               competitionSlug: String = "eng.1",
+               state: MatchState,
                statusDetail: String,
                score: Score = Score(home: 0, away: 0),
                penaltyShootout: PenaltyShootout? = nil,
@@ -12,8 +14,8 @@ func makeMatch(state: MatchState,
                isKickoffConfirmed: Bool = true,
                home: Team = Team(id: "359", name: "Arsenal", abbreviation: "ARS", logoURL: nil),
                away: Team = Team(id: "363", name: "Chelsea", abbreviation: "CHE", logoURL: nil)) -> Match {
-    Match(id: "740001",
-          competitionSlug: "eng.1",
+    Match(id: id,
+          competitionSlug: competitionSlug,
           home: home,
           away: away,
           score: score,

@@ -103,7 +103,8 @@ struct MatchListView: View {
     private var content: some View {
         Group {
             let groups = store.matchesByCompetition
-            if let error = store.errorMessage, store.matches.isEmpty {
+            // Set only when every Competition failed with nothing loaded.
+            if let error = store.errorMessage {
                 errorState(error)
             } else if groups.isEmpty {
                 emptyState
@@ -113,7 +114,8 @@ struct MatchListView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(groups, id: \.competition.id) { group in
-                            competitionSection(group.competition, matches: group.matches)
+                            competitionSection(group.competition, status: group.status,
+                                               matches: group.matches)
                         }
                     }
                     .padding(.vertical, 10)
@@ -128,12 +130,21 @@ struct MatchListView: View {
         .frame(height: Self.contentHeight)
     }
 
-    private func competitionSection(_ competition: Competition, matches: [Match]) -> some View {
+    /// A Competition's header, the note when its latest fetch failed, and its
+    /// Matches. A Competition that failed to load has the header and note only.
+    private func competitionSection(_ competition: Competition, status: CompetitionLoadStatus,
+                                    matches: [Match]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(competition.displayName.uppercased())
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(competition.displayName.uppercased())
+                    .font(.caption2.weight(.semibold))
+                if let note = competitionFailureNote(for: status) {
+                    Text(note)
+                        .font(.caption2)
+                }
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
             ForEach(matches) { match in
                 MatchRow(match: match)
             }
