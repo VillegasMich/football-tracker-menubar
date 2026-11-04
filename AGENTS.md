@@ -49,10 +49,10 @@ responses from the Primary Source are saved real JSON files under
 | `Sources/FootballMenuBar/MenuContent.swift` | Menu bar dropdown contents |
 
 Suggested structure as the app grows (not yet created):
-- `Models/` — `League`, `Match`, `Team`, `Score` value types.
+- `Models/` — `Competition`, `Match`, `Team`, `Score` value types.
 - `Services/` — API client for fetching fixtures/live scores.
-- `Store/` — observable app state (selected leagues, cached matches).
-- `Views/` — SwiftUI views (menu content, league picker / settings).
+- `Store/` — observable app state (Followed Competitions, cached matches).
+- `Views/` — SwiftUI views (menu content, Competition picker / settings).
 
 ## Conventions
 - Prefer value types (`struct`) and `Codable` for API models.
@@ -60,10 +60,10 @@ Suggested structure as the app grows (not yet created):
   the SwiftUI environment; avoid globals and singletons where practical.
 - Networking is `async/await` with `URLSession`; no third-party deps unless a
   clear need is discussed first.
-- Persist the user's selected leagues (e.g. `UserDefaults`) so choices survive
+- Persist the user's Followed Competitions (e.g. `UserDefaults`) so choices survive
   restarts.
 - Switch `MenuBarExtra` to `.menuBarExtraStyle(.window)` when a richer popover
-  UI (match lists, league picker) is needed instead of a plain dropdown menu.
+  UI (match lists, Competition picker) is needed instead of a plain dropdown menu.
 
 ## Open decisions / TODO
 - ~~Choose a football data API.~~ Decided: ESPN is the Primary Source, with
