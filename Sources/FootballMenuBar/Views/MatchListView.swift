@@ -248,8 +248,8 @@ private struct MatchRow: View {
         HStack(alignment: .center, spacing: 8) {
             pinButton
             VStack(alignment: .leading, spacing: 2) {
-                teamLine(match.home)
-                teamLine(match.away)
+                teamLine(match.home, isEmphasised: presentation.emphasisedTeam == .home)
+                teamLine(match.away, isEmphasised: presentation.emphasisedTeam == .away)
             }
             .font(.subheadline)
             Spacer()
@@ -290,10 +290,14 @@ private struct MatchRow: View {
                 set: { if !$0 { editingTeam = nil } })
     }
 
-    private func teamLine(_ team: Team) -> some View {
+    /// A team's logo and name. An emphasised team (a Penalty Shootout winner)
+    /// has its name in bold; every other team stays regular weight.
+    private func teamLine(_ team: Team, isEmphasised: Bool) -> some View {
         HStack(spacing: 6) {
             TeamLogoView(team: team)
-            Text(team.name).lineLimit(1)
+            Text(team.name)
+                .fontWeight(isEmphasised ? .bold : .regular)
+                .lineLimit(1)
         }
         .contextMenu {
             Button("Set abbreviation…") {

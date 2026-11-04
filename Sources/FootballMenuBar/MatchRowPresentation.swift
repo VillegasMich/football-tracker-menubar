@@ -18,8 +18,8 @@ struct MatchRowPresentation {
     let isLiveStyle: Bool
     /// The score column.
     let score: ScoreText
-    /// The team shown with emphasis, if any. Always `nil` for now; a Penalty
-    /// Shootout winner will use it (#7).
+    /// The team shown with emphasis, if any: the winner of a Finished Match's
+    /// Penalty Shootout. `nil` for every other Match.
     let emphasisedTeam: Side?
     /// Whether the row offers the highlights button.
     let offersHighlights: Bool
@@ -31,8 +31,17 @@ struct MatchRowPresentation {
          locale: Locale = .autoupdatingCurrent,
          timeZone: TimeZone = .autoupdatingCurrent) {
         isLiveStyle = match.isLive
-        emphasisedTeam = nil
         offersHighlights = match.state == .finished
+        // A Finished Match decided by a Penalty Shootout: the shootout result
+        // in home–away order (e.g. "4–3 pens") replaces the Primary Source's
+        // "FT-Pens", and the winner is emphasised.
+        if match.state == .finished, let shootout = match.penaltyShootout {
+            score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
+            badgeText = "\(shootout.home)–\(shootout.away) pens"
+            emphasisedTeam = shootout.winner
+            return
+        }
+        emphasisedTeam = nil
         switch match.state {
         case .upcoming:
             score = .dash

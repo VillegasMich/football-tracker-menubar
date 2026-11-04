@@ -31,5 +31,9 @@ func utc(_ string: String) -> Date {
     return f.date(from: string)!
 }
 
+/// The teams of the 2026 Champions League final, as the Primary Source names them.
+let paris = Team(id: "160", name: "Paris Saint-Germain", abbreviation: "PSG", logoURL: nil)
+let arsenal = Team(id: "359", name: "Arsenal", abbreviation: "ARS", logoURL: nil)
+
 let madrid = TimeZone(identifier: "Europe/Madrid")!
 let britishEnglish = Locale(identifier: "en_GB")

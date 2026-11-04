@@ -108,6 +108,49 @@ struct MatchRowPresentationTests {
         #expect(!row.isLiveStyle)
     }
 
+    @Test("A Match decided by a Penalty Shootout shows the shootout result as badge, emphasises the winner and offers highlights")
+    func penaltyShootoutWinner() {
+        // The 2026 Champions League final: Paris Saint-Germain 1–1 Arsenal,
+        // Paris Saint-Germain win 4–3 on penalties.
+        let match = makeMatch(state: .finished, statusDetail: "FT-Pens",
+                              score: Score(home: 1, away: 1),
+                              penaltyShootout: PenaltyShootout(home: 4, away: 3),
+                              home: paris, away: arsenal)
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == "4–3 pens")
+        #expect(row.score == .goals(home: "1", away: "1"))
+        #expect(row.emphasisedTeam == .home)
+        #expect(row.offersHighlights)
+        #expect(!row.isLiveStyle)
+    }
+
+    @Test("An away win in a Penalty Shootout emphasises the away team, with the badge in home–away order")
+    func penaltyShootoutAwayWinner() {
+        // Scottish Challenge Cup, 3 Nov 2026: Aberdeen B 1–1 Queen's Park,
+        // Queen's Park (away) win 4–2 on penalties.
+        let match = makeMatch(state: .finished, statusDetail: "FT-Pens",
+                              score: Score(home: 1, away: 1),
+                              penaltyShootout: PenaltyShootout(home: 2, away: 4))
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == "2–4 pens")
+        #expect(row.emphasisedTeam == .away)
+    }
+
+    @Test("A Match that went to extra time without penalties still shows AET and emphasises no team")
+    func extraTimeWithoutPenalties() {
+        let match = makeMatch(state: .finished, statusDetail: "AET", score: Score(home: 3, away: 1))
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.badgeText == "AET")
+        #expect(row.emphasisedTeam == nil)
+        #expect(row.offersHighlights)
+    }
+
     @Test("No team is emphasised", arguments: [MatchState.upcoming, .inProgress, .finished])
     func noTeamEmphasised(state: MatchState) {
         let match = makeMatch(state: state, statusDetail: "", score: Score(home: 3, away: 0))
