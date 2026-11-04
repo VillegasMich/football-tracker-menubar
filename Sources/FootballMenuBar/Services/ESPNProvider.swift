@@ -98,6 +98,10 @@ private struct Event: Decodable {
     }
 
     struct Competition: Decodable {
+        /// Whether the kickoff time is confirmed. `false` on Cup Matches
+        /// with a nominal time (shortDetail `TBD`). Optional so an absent
+        /// flag never fails decoding; absent counts as confirmed.
+        let timeValid: Bool?
         let competitors: [Competitor]
         struct Competitor: Decodable {
             let homeAway: String
@@ -160,7 +164,8 @@ private struct Event: Decodable {
                               state: status.type.state,
                               completed: status.type.completed),
             statusDetail: status.type.shortDetail ?? status.type.detail ?? "",
-            kickoff: Self.parseDate(date) ?? .distantFuture
+            kickoff: Self.parseDate(date) ?? .distantFuture,
+            isKickoffConfirmed: competition.timeValid ?? true
         )
     }
 

@@ -9,6 +9,7 @@ func makeMatch(state: MatchState,
                score: Score = Score(home: 0, away: 0),
                penaltyShootout: PenaltyShootout? = nil,
                kickoff: Date = utc("2026-11-01T19:00Z"),
+               isKickoffConfirmed: Bool = true,
                home: Team = Team(id: "359", name: "Arsenal", abbreviation: "ARS", logoURL: nil),
                away: Team = Team(id: "363", name: "Chelsea", abbreviation: "CHE", logoURL: nil)) -> Match {
     Match(id: "740001",
@@ -19,7 +20,8 @@ func makeMatch(state: MatchState,
           penaltyShootout: penaltyShootout,
           state: state,
           statusDetail: statusDetail,
-          kickoff: kickoff)
+          kickoff: kickoff,
+          isKickoffConfirmed: isKickoffConfirmed)
 }
 
 /// Parses `yyyy-MM-dd'T'HH:mm'Z'` as a UTC instant.

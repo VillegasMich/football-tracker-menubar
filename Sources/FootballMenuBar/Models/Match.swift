@@ -17,6 +17,10 @@ struct Match: Codable, Identifiable, Hashable, Sendable {
     /// ESPN's short status text, e.g. `"37'"`, `"FT"`, or a kickoff time.
     let statusDetail: String
     let kickoff: Date
+    /// Whether the Primary Source has confirmed the kickoff time. An
+    /// unconfirmed kickoff is only a nominal time (e.g. 20:00Z for every
+    /// Carabao Cup quarter-final), shown to the user as "TBD".
+    let isKickoffConfirmed: Bool
 
     var isLive: Bool { state == .inProgress }
 
