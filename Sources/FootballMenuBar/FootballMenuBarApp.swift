@@ -139,7 +139,8 @@ private struct MenuBarLabel: View {
         let score = NSAttributedString(string: MenuBarTitle.middle(for: match),
                                        attributes: [.font: scoreFont, .foregroundColor: textColor])
         let scoreSize = score.size()
-        // Optional suffix after the away team, e.g. `(Abd)` for an Abandoned Match.
+        // Optional suffix after the away team, e.g. `(Abd)` for an Abandoned Match or
+        // `(4–3p)` for a Match decided by a Penalty Shootout.
         let suffix = MenuBarTitle.suffix(for: match).map { text -> (image: NSImage?, text: NSAttributedString?, width: CGFloat) in
             let s = NSAttributedString(string: text, attributes: [.font: scoreFont, .foregroundColor: textColor])
             return (nil, s, s.size().width)
