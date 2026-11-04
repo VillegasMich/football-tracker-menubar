@@ -164,8 +164,8 @@ struct MatchListView: View {
                 icon: "calendar",
                 title: "No matches on \(Self.emptyDayFormatter.string(from: store.selectedDate))",
                 subtitle: store.isViewingToday
-                    ? "Nothing live or scheduled in your leagues today."
-                    : "Nothing scheduled in your leagues that day.")
+                    ? "Nothing live or scheduled in your competitions today."
+                    : "Nothing scheduled in your competitions that day.")
             if !store.isViewingToday {
                 Button("Back to today") { Task { await store.goToToday() } }
                     .buttonStyle(.borderless)

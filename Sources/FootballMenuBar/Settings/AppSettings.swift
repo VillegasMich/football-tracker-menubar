@@ -20,6 +20,13 @@ final class AppSettings: ObservableObject {
         static let notificationsEnabled = "settings.notificationsEnabled"
         static let notifyOnKickoff = "settings.notifyOnKickoff"
         static let notifyOnGoal = "settings.notifyOnGoal"
+        static let followedCompetitions = "settings.followedCompetitions"
+    }
+
+    /// The Competitions the user follows, in catalogue order. Persisted as
+    /// their slugs.
+    @Published private(set) var followedCompetitions: [Competition] {
+        didSet { defaults.set(followedCompetitions.map(\.slug), forKey: Key.followedCompetitions) }
     }
 
     /// Selected refresh cadence preset. Persisted by raw string; an unknown
@@ -100,6 +107,36 @@ final class AppSettings: ObservableObject {
         // is ignored rather than crashing.
         let raw = defaults.dictionary(forKey: Key.abbreviationOverrides) ?? [:]
         self.abbreviationOverrides = raw.compactMapValues { $0 as? String }
+        let followed = Competition.inCatalogue(slugs: defaults.stringArray(forKey: Key.followedCompetitions) ?? [])
+        self.followedCompetitions = followed.isEmpty ? Competition.defaultFollowed : followed
+    }
+
+    // MARK: - Followed Competitions
+
+    /// Follow `competition`, keeping the list in catalogue order.
+    func follow(_ competition: Competition) {
+        setFollowed(followedCompetitions + [competition])
+    }
+
+    /// Stop following `competition`. Refused (a no-op) when it is the last
+    /// Followed Competition: see `canUnfollow(_:)`.
+    func unfollow(_ competition: Competition) {
+        guard canUnfollow(competition) else { return }
+        setFollowed(followedCompetitions.filter { $0 != competition })
+    }
+
+    func isFollowed(_ competition: Competition) -> Bool {
+        followedCompetitions.contains(competition)
+    }
+
+    /// False only for the last Followed Competition, which can't be
+    /// unfollowed so that at least one is always followed.
+    func canUnfollow(_ competition: Competition) -> Bool {
+        followedCompetitions != [competition]
+    }
+
+    private func setFollowed(_ competitions: [Competition]) {
+        followedCompetitions = Competition.inCatalogue(slugs: competitions.map(\.slug))
     }
 
     // MARK: - Abbreviation overrides

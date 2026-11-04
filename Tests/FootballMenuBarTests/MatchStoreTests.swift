@@ -19,12 +19,125 @@ final class MatchStoreTests {
         UserDefaults().removePersistentDomain(forName: suiteName)
     }
 
+    /// A store following the Premier League and the Champions League.
     private func makeStore() -> MatchStore {
-        MatchStore(provider: provider,
-                   competitions: [premierLeague, championsLeague],
-                   defaults: defaults,
-                   settings: AppSettings(defaults: defaults),
-                   notifier: nil)
+        let settings = AppSettings(defaults: defaults)
+        settings.unfollow(worldCup)
+        return MatchStore(provider: provider,
+                          defaults: defaults,
+                          settings: settings,
+                          notifier: nil)
+    }
+
+    // MARK: - Followed Competitions
+
+    @Test("On first launch the Followed Competitions are the three defaults, and only they are requested")
+    func firstLaunchFollowsDefaults() async {
+        let store = MatchStore(provider: provider, defaults: defaults,
+                               settings: AppSettings(defaults: defaults), notifier: nil)
+
+        await store.loadInitial()
+
+        #expect(store.settings.followedCompetitions.map(\.displayName)
+                == ["Premier League", "Champions League", "World Cup"])
+        #expect(provider.requestedSlugs == [["eng.1", "uefa.champions", "fifa.world"]])
+    }
+
+    @Test("Following and unfollowing persists across launches")
+    func followingPersists() {
+        let settings = AppSettings(defaults: defaults)
+
+        settings.follow(laLiga)
+        settings.unfollow(worldCup)
+
+        #expect(AppSettings(defaults: defaults).followedCompetitions.map(\.displayName)
+                == ["Premier League", "LaLiga", "Champions League"])
+    }
+
+    @Test("Unknown stored slugs are ignored")
+    func unknownSlugsIgnored() {
+        defaults.set(["eng.fa_qual", "esp.1", "gone.1"], forKey: followedCompetitionsKey)
+
+        #expect(AppSettings(defaults: defaults).followedCompetitions == [laLiga])
+    }
+
+    @Test("The defaults apply when no stored slug is valid")
+    func defaultsWhenNothingValid() {
+        defaults.set(["gone.1"], forKey: followedCompetitionsKey)
+
+        #expect(AppSettings(defaults: defaults).followedCompetitions.map(\.displayName)
+                == ["Premier League", "Champions League", "World Cup"])
+    }
+
+    @Test("Unfollowing the last Followed Competition is refused")
+    func lastCompetitionCannotBeUnfollowed() {
+        let settings = AppSettings(defaults: defaults)
+        settings.unfollow(worldCup)
+        settings.unfollow(championsLeague)
+        #expect(settings.canUnfollow(premierLeague) == false)
+
+        settings.unfollow(premierLeague)
+
+        #expect(settings.followedCompetitions == [premierLeague])
+        #expect(AppSettings(defaults: defaults).followedCompetitions == [premierLeague])
+    }
+
+    @Test("A Followed Competition can be unfollowed while another is followed")
+    func competitionCanBeUnfollowedWhileAnotherIsFollowed() {
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.isFollowed(worldCup))
+        #expect(settings.canUnfollow(worldCup))
+        #expect(!settings.isFollowed(laLiga))
+    }
+
+    @Test("Following a Competition refreshes the browsed day straight away, including it")
+    func followingRefreshes() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        provider.succeed(laLiga, with: [barcelonaRealMadrid])
+        await store.loadInitial()
+
+        store.settings.follow(laLiga)
+        await store.followedCompetitionsRefresh?.value
+
+        #expect(provider.requestedSlugs.last == ["eng.1", "esp.1", "uefa.champions"])
+        #expect(store.matchesByCompetition.map(\.competition) == [premierLeague, laLiga])
+        #expect(store.matchesByCompetition.map(\.matches) == [[arsenalChelsea], [barcelonaRealMadrid]])
+    }
+
+    @Test("Unfollowing a Competition removes its Matches from the list straight away")
+    func unfollowingRemovesMatches() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+
+        store.settings.unfollow(championsLeague)
+
+        #expect(store.matchesByCompetition.map(\.competition) == [premierLeague])
+        #expect(store.matches == [arsenalChelsea])
+        await store.followedCompetitionsRefresh?.value
+        #expect(provider.requestedSlugs.last == ["eng.1"])
+        #expect(store.matches == [arsenalChelsea])
+    }
+
+    @Test("Sections are listed in catalogue order, regardless of follow order")
+    func sectionsInCatalogueOrder() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        provider.succeed(championsLeague, with: [parisBayern])
+        provider.succeed(worldCup, with: [brazilFrance])
+        provider.succeed(laLiga, with: [barcelonaRealMadrid])
+        await store.loadInitial()
+
+        store.settings.follow(worldCup)
+        await store.followedCompetitionsRefresh?.value
+        store.settings.follow(laLiga)
+        await store.followedCompetitionsRefresh?.value
+
+        #expect(store.matchesByCompetition.map(\.competition.displayName)
+                == ["Premier League", "LaLiga", "Champions League", "World Cup"])
     }
 
     // MARK: - A Competition that fails
@@ -197,6 +310,22 @@ final class MatchStoreTests {
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
     }
 
+    @Test("Unfollowing the Pinned Match's Competition keeps the pin, while its Matches leave the list")
+    func unfollowingPinnedMatchCompetitionKeepsPin() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+        store.pin(arsenalChelsea)
+
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        await store.refresh()
+
+        #expect(store.pinnedSnapshot == arsenalChelsea)
+        #expect(store.matches == [parisBayern])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -216,8 +345,13 @@ final class MatchStoreTests {
     }
 }
 
-private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League")
-private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League")
+/// Where the settings store the Followed Competitions' slugs.
+private let followedCompetitionsKey = "settings.followedCompetitions"
+
+private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League", region: .england)
+private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
+private let laLiga = Competition(slug: "esp.1", displayName: "LaLiga", region: .spain)
+private let worldCup = Competition(slug: "fifa.world", displayName: "World Cup", region: .fifa)
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
 /// each use, so it is today for whichever test reads it.
@@ -239,6 +373,18 @@ private var parisBayern: Match {
     makeMatch(id: "2", competitionSlug: "uefa.champions", state: .upcoming,
               statusDetail: "8:00 PM", kickoff: todayKickoff,
               home: paris, away: bayern)
+}
+private var barcelonaRealMadrid: Match {
+    makeMatch(id: "4", competitionSlug: "esp.1", state: .upcoming,
+              statusDetail: "8:00 PM", kickoff: todayKickoff,
+              home: Team(id: "83", name: "Barcelona", abbreviation: "BAR", logoURL: nil),
+              away: Team(id: "86", name: "Real Madrid", abbreviation: "RMA", logoURL: nil))
+}
+private var brazilFrance: Match {
+    makeMatch(id: "5", competitionSlug: "fifa.world", state: .upcoming,
+              statusDetail: "8:00 PM", kickoff: todayKickoff,
+              home: Team(id: "205", name: "Brazil", abbreviation: "BRA", logoURL: nil),
+              away: Team(id: "478", name: "France", abbreviation: "FRA", logoURL: nil))
 }
 private var parisBayernLive: Match {
     makeMatch(id: "2", competitionSlug: "uefa.champions", state: .inProgress,
