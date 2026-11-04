@@ -1,12 +1,12 @@
 # football-menubar-app
 
 A macOS **menu bar app** that shows football (soccer) matches and **live results**.
-The user picks which **leagues** they care about, and the menu bar surfaces
-matches and scores from just those leagues.
+The user picks which **Competitions** they follow, and the menu bar surfaces
+matches and scores from just those Competitions.
 
 ## Product goals
-- Live and upcoming match results for a set of supported leagues.
-- A settings/selection UI where the user chooses which leagues to follow.
+- Live and upcoming match results for a curated set of Competitions.
+- A settings/selection UI where the user chooses which Competitions to follow.
 - Lightweight, glanceable menu bar presence — quick to open, no Dock icon.
 - Auto-refreshing scores at a sensible interval while matches are live.
 
@@ -70,7 +70,7 @@ Suggested structure as the app grows (not yet created):
 - ~~Choose a football data API.~~ Decided: ESPN is the Primary Source, with
   OpenLigaDB as a Backup Source for German Competitions. See
   `docs/adr/0001-espn-primary-source-openligadb-backup.md`.
-- ~~Define the initial set of supported leagues.~~ Decided: a curated list of 36
+- ~~Define the initial set of supported leagues.~~ Decided: a curated list of 37
   Competitions, specified in the Followed Competitions spec (GitHub issue).
 - Decide the live-score refresh cadence and how to back off when idle.
 

@@ -25,7 +25,9 @@ surfaces scores, kickoff times, and live match minutes at a glance.
   today's matches, scores, and status
 - **Menu bar live indicator** — pin a match and show a red "live" pill (with
   the match minute) directly in the menu bar title
-- **World Cup, Premier League & Champions League** coverage out of the box
+- **Choose from 37 Competitions** — Leagues and Cups from England, Spain,
+  Germany, Italy, France and beyond, plus UEFA, the Americas and FIFA; the
+  World Cup, Premier League and Champions League are followed out of the box
 - **Custom team abbreviations** — right-click any team to set your own
   abbreviation, used wherever a crest isn't available
 - **Configurable refresh cadence** — Battery Saver, Balanced, or Aggressive
@@ -110,6 +112,9 @@ Login Items → Open at Login**, where it can also be removed.
 Open the **Settings** window from the gear icon in the popover footer (the app
 is a Dock-less accessory, so there's no Dock menu). It offers:
 
+- **Competitions** — choose your Followed Competitions from 37, grouped by
+  region (collapsed until you expand one). The popover shows only those, in
+  the curated order, and at least one stays followed
 - **Open at login** — start Football Menu Bar automatically when you log in.
   Off by default. The switch reflects **System Settings → General → Login
   Items**, so removing the entry there turns it off here too, and the app never
@@ -134,7 +139,7 @@ across relaunches.
 | `Sources/FootballMenuBar/Settings/AppSettings.swift` | Persisted, observable user configuration |
 | `Sources/FootballMenuBar/Store/MatchStore.swift` | Match data store and the state-driven refresh loop |
 | `Sources/FootballMenuBar/Services/ESPNProvider.swift` | Fetches live match data from ESPN's scoreboard API |
-| `Sources/FootballMenuBar/Models/League.swift` | Supported leagues (World Cup, Premier League, Champions League) |
+| `Sources/FootballMenuBar/Models/Competition.swift` | The catalogue of 37 Competitions, grouped by region, and the default Followed Competitions |
 
 ## Data Source
 
