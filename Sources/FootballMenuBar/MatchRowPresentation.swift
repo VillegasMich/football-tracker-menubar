@@ -51,9 +51,14 @@ struct MatchRowPresentation {
             } else {
                 badgeText = match.statusDetail
             }
-        case .inProgress, .finished, .abandoned:
+        case .inProgress, .finished:
             score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
             badgeText = match.statusDetail
+        case .abandoned:
+            // The score from when play stopped; our own word, not the
+            // Primary Source's `ABN` or `Susp`.
+            score = .goals(home: "\(match.score.home)", away: "\(match.score.away)")
+            badgeText = "Abandoned"
         case .postponed, .cancelled:
             // Never played, so no score; our own word, not the Primary Source's.
             score = .dash
