@@ -160,6 +160,38 @@ struct ESPNProviderTests {
         #expect(liverpool.away.name == "AFC Bournemouth")
     }
 
+    @Test("A Match whose teams are both placeholders produces no Match")
+    func bothPlaceholderTeamsDropped() async throws {
+        // Coppa Italia, 3 Feb 2027: four quarter-finals, each `TBD Home`
+        // (team id 131556) v `TBD Away` (team id 131554), `timeValid: false`.
+        // No real day mixes these with a real Match; see the edited fixture
+        // below for that.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [coppaItalia], on: localDay(2027, 2, 3))
+
+        #expect(matches.isEmpty)
+    }
+
+    @Test("A Match with one placeholder team is kept, while both-placeholder Matches in the same response are dropped")
+    func onePlaceholderTeamKept() async throws {
+        // EDITED fixture, not a verbatim response: the real Coppa Italia
+        // response above (3 Feb 2027) with only event 401912254's home
+        // competitor (`TBD Home`) replaced by AS Roma's, copied from the real
+        // Coppa Italia event 401912496. The other three events are unchanged.
+        // No real one-placeholder Match has been observed.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedTeams], on: localDay(2027, 2, 3))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401912254")
+        #expect(match.home.name == "AS Roma")
+        #expect(match.away.name == "TBD Away")
+        #expect(match.state == .upcoming)
+        #expect(!match.isKickoffConfirmed)
+    }
+
     @Test("A kickoff the Primary Source has confirmed decodes as confirmed")
     func confirmedKickoff() async throws {
         // Premier League, 1 Nov 2026: Liverpool 0–1 Arsenal, `timeValid: true`.
@@ -211,6 +243,9 @@ private let nationalLeague = League(slug: "eng.5", displayName: "National League
 private let carabaoCup = League(slug: "eng.league_cup", displayName: "Carabao Cup")
 /// Test-only slug serving fixtures edited from real responses.
 private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")
+private let coppaItalia = League(slug: "ita.coppa_italia", displayName: "Coppa Italia")
+/// Test-only slug serving a real response with one placeholder team replaced.
+private let editedTeams = League(slug: "test.edited-teams", displayName: "Edited teams (test only)")
 /// Test-only slug serving a real response with its `timeValid` flag removed.
 private let editedKickoff = League(slug: "test.edited-kickoff", displayName: "Edited kickoff (test only)")
 

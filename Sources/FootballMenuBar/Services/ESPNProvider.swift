@@ -126,14 +126,27 @@ private struct Event: Decodable {
         }
     }
 
+    /// The Primary Source's placeholder teams for a Cup round whose teams
+    /// aren't decided yet: `TBD Home` (131556) and `TBD Away` (131554). Seen
+    /// on every placeholder event, with the same ids across rounds. Matched
+    /// by id rather than name: ids are the Primary Source's stable identity
+    /// for a team, while names are display text.
+    private static let placeholderTeamIDs: Set<String> = ["131556", "131554"]
+
     /// Maps an ESPN event to the app's `Match`, or nil if it lacks the two
-    /// competitors we require.
+    /// competitors we require or both of its teams are placeholders. A Match
+    /// with one placeholder team is kept, so a team's next Cup Match shows
+    /// before its opponent is known.
     func toMatch(leagueSlug: String) -> Match? {
         guard let competition = competitions.first else { return nil }
         guard
             let homeC = competition.competitors.first(where: { $0.homeAway == "home" }),
             let awayC = competition.competitors.first(where: { $0.homeAway == "away" })
         else { return nil }
+        if Self.placeholderTeamIDs.contains(homeC.team.id),
+           Self.placeholderTeamIDs.contains(awayC.team.id) {
+            return nil
+        }
 
         let home = Team(id: homeC.team.id,
                         name: homeC.team.displayName,
