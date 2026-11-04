@@ -114,7 +114,7 @@ private struct MenuBarLabel: View {
 
     // MARK: - Logo-mode compositing
 
-    /// Draw the whole logo-mode title — `[home] score [away] (pill)` — into one
+    /// Draw the whole logo-mode title — `[home] score [away] (suffix) (pill)` — into one
     /// `NSImage`, the reliable way to get multiple crests plus text into a menu
     /// bar label. Non-template so the crests keep their colors; the text color
     /// tracks the current color scheme.
@@ -139,6 +139,11 @@ private struct MenuBarLabel: View {
         let score = NSAttributedString(string: MenuBarTitle.middle(for: match),
                                        attributes: [.font: scoreFont, .foregroundColor: textColor])
         let scoreSize = score.size()
+        // Optional suffix after the away team, e.g. `(Abd)` for an Abandoned Match.
+        let suffix = MenuBarTitle.suffix(for: match).map { text -> (image: NSImage?, text: NSAttributedString?, width: CGFloat) in
+            let s = NSAttributedString(string: text, attributes: [.font: scoreFont, .foregroundColor: textColor])
+            return (nil, s, s.size().width)
+        }
 
         // Optional live pill.
         let showPill = match.isLive && settings.showLiveIndicator
@@ -149,6 +154,7 @@ private struct MenuBarLabel: View {
         let pillWidth: CGFloat = showPill ? (pillText.map { $0.size().width + 10 } ?? 7) : 0
 
         var width = home.width + gap + scoreSize.width + gap + away.width
+        if let suffix { width += gap + suffix.width }
         if showPill { width += gap + pillWidth }
         width = ceil(width) + 2
 
@@ -174,6 +180,11 @@ private struct MenuBarLabel: View {
         score.draw(at: NSPoint(x: x, y: (height - scoreSize.height) / 2))
         x += scoreSize.width + gap
         draw(away)
+
+        if let suffix {
+            x += gap
+            draw(suffix)
+        }
 
         if showPill {
             x += gap

@@ -49,6 +49,52 @@ struct ESPNProviderTests {
         #expect(match.state == .cancelled)
     }
 
+    @Test("An Abandoned Match decodes as Abandoned with the score from when play stopped")
+    func abandonedMatch() async throws {
+        // Liga 1 (Peru), 8 Nov 2025: Ayacucho FC 1–0 Comerciantes Unidos,
+        // stopped at 90'+5' (`STATUS_ABANDONED`, state `post`,
+        // `completed: false`, shortDetail `ABN`).
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [peruLiga1], on: localDay(2025, 11, 8))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "760180")
+        #expect(match.state == .abandoned)
+        #expect(match.score == Score(home: 1, away: 0))
+    }
+
+    @Test("A stopped Match that has not resumed (`STATUS_SUSPENDED`) decodes as Abandoned with its partial score")
+    func stoppedNotResumedMatch() async throws {
+        // National League, dated 15 Dec 2026: Barrow 1–0 Forest Green Rovers,
+        // stopped at 18' (`STATUS_SUSPENDED`, state `post`, `completed: false`,
+        // shortDetail `Susp`).
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [nationalLeague], on: localDay(2026, 12, 15))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401889241")
+        #expect(match.state == .abandoned)
+        #expect(match.score == Score(home: 1, away: 0))
+    }
+
+    @Test("A stopped Match that has resumed (`STATUS_SUSPENDED` in state `in`) decodes as Live")
+    func resumedMatch() async throws {
+        // EDITED fixture, not a verbatim response: the real stopped Match
+        // above (Barrow 1–0 Forest Green Rovers, 15 Dec 2026) with only the
+        // event's `status.type.state` changed from `post` to `in`. The name
+        // stays `STATUS_SUSPENDED`. No real resumed Match has been observed.
+        let provider = ESPNProvider(session: .espnFixtures)
+
+        let matches = try await provider.matches(for: [editedStatus], on: localDay(2026, 12, 15))
+
+        let match = try #require(matches.only)
+        #expect(match.id == "401889241")
+        #expect(match.state == .inProgress)
+        #expect(match.score == Score(home: 1, away: 0))
+    }
+
     @Test("A Match that went to extra time still decodes as Finished")
     func extraTimeMatch() async throws {
         // FA Cup qualifying, 11 Aug 2026: Worcester Raiders at Ashby Ivanhoe,
@@ -82,6 +128,8 @@ struct ESPNProviderTests {
 
 private let premierLeague = League(slug: "eng.1", displayName: "Premier League")
 private let faCupQualifying = League(slug: "eng.fa_qual", displayName: "FA Cup Qualifying")
+private let peruLiga1 = League(slug: "per.1", displayName: "Liga 1 (Peru)")
+private let nationalLeague = League(slug: "eng.5", displayName: "National League")
 /// Test-only slug serving fixtures edited from real responses.
 private let editedStatus = League(slug: "test.edited-status", displayName: "Edited status (test only)")
 

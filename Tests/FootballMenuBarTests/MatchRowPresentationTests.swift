@@ -95,6 +95,19 @@ struct MatchRowPresentationTests {
         #expect(!row.isLiveStyle)
     }
 
+    @Test("An Abandoned Match shows its partial score and an Abandoned badge, with no highlights and not in the Live style")
+    func abandoned() {
+        // `ABN` is the Primary Source's own short detail, as seen in real responses.
+        let match = makeMatch(state: .abandoned, statusDetail: "ABN", score: Score(home: 1, away: 0))
+
+        let row = MatchRowPresentation(match: match, locale: britishEnglish, timeZone: madrid)
+
+        #expect(row.score == .goals(home: "1", away: "0"))
+        #expect(row.badgeText == "Abandoned")
+        #expect(!row.offersHighlights)
+        #expect(!row.isLiveStyle)
+    }
+
     @Test("No team is emphasised", arguments: [MatchState.upcoming, .inProgress, .finished])
     func noTeamEmphasised(state: MatchState) {
         let match = makeMatch(state: state, statusDetail: "", score: Score(home: 3, away: 0))

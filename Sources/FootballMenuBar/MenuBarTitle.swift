@@ -9,6 +9,7 @@ enum MenuBarTitle {
     /// - live / finished: `"ARS 1 – 0 CHE"` (abbreviations + score)
     /// - upcoming: `"ARS 7:00 PM CHE"` (abbreviations + kickoff time)
     /// - postponed / cancelled: `"ARS Postponed CHE"`, `"ARS Cancelled CHE"`
+    /// - abandoned: `"ARS 1 – 0 CHE (Abd)"` (score from when play stopped)
     ///
     /// `abbreviation` resolves each team's displayed abbreviation, so callers can
     /// route it through the per-team overrides. Defaults to the team's own
@@ -21,12 +22,21 @@ enum MenuBarTitle {
         guard let match else { return nil }
         let home = abbreviation(match.home).uppercased()
         let away = abbreviation(match.away).uppercased()
-        return "\(home) \(middle(for: match, locale: locale, timeZone: timeZone)) \(away)"
+        let title = "\(home) \(middle(for: match, locale: locale, timeZone: timeZone)) \(away)"
+        guard let suffix = suffix(for: match) else { return title }
+        return "\(title) \(suffix)"
+    }
+
+    /// The segment after the away team, shared by the text title and the
+    /// logo-mode title: `"(Abd)"` for an Abandoned Match, `nil` otherwise.
+    static func suffix(for match: Match) -> String? {
+        match.state == .abandoned ? "(Abd)" : nil
     }
 
     /// The state-dependent middle segment shared by the text title and the
-    /// logo-mode title: the score while in-progress/finished, the kickoff time
-    /// while upcoming, and the status word when postponed or cancelled.
+    /// logo-mode title: the score while in-progress, finished or abandoned, the
+    /// kickoff time while upcoming, and the status word when postponed or
+    /// cancelled.
     static func middle(for match: Match,
                        locale: Locale = .autoupdatingCurrent,
                        timeZone: TimeZone = .autoupdatingCurrent) -> String {
@@ -39,10 +49,10 @@ enum MenuBarTitle {
             f.dateStyle = .none
             f.timeStyle = .short
             return f.string(from: match.kickoff)
-        case .inProgress, .finished:
+        case .inProgress, .finished, .abandoned:
             return match.score.display
         case .postponed, .cancelled:
-            return match.state.unplayedStatusWord ?? match.statusDetail
+            return match.state.statusWord ?? match.statusDetail
         }
     }
 }

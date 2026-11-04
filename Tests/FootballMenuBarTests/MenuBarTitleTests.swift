@@ -42,6 +42,13 @@ struct MenuBarTitleTests {
         #expect(MenuBarTitle.text(for: match) == title)
     }
 
+    @Test("An Abandoned Match shows its partial score, then (Abd) after the away abbreviation")
+    func abandonedShowsScoreAndAbd() {
+        let match = makeMatch(state: .abandoned, statusDetail: "ABN", score: Score(home: 1, away: 0))
+
+        #expect(MenuBarTitle.text(for: match) == "ARS 1 – 0 CHE (Abd)")
+    }
+
     @Test("Abbreviation overrides replace the Primary Source's abbreviations, uppercased")
     func abbreviationOverrides() {
         let match = makeMatch(state: .finished, statusDetail: "FT", score: Score(home: 2, away: 3))
@@ -71,5 +78,21 @@ struct MenuBarTitleTests {
         let match = makeMatch(state: state, statusDetail: primarySourceDetail)
 
         #expect(MenuBarTitle.middle(for: match) == middle)
+    }
+
+    @Test("The logo-mode title shows an Abandoned Match's partial score, then (Abd) after the away team")
+    func logoModeAbandoned() {
+        let match = makeMatch(state: .abandoned, statusDetail: "ABN", score: Score(home: 1, away: 0))
+
+        #expect(MenuBarTitle.middle(for: match) == "1 – 0")
+        #expect(MenuBarTitle.suffix(for: match) == "(Abd)")
+    }
+
+    @Test("Only an Abandoned Match has a title suffix",
+          arguments: [MatchState.upcoming, .inProgress, .finished, .postponed, .cancelled])
+    func noSuffixOtherwise(state: MatchState) {
+        let match = makeMatch(state: state, statusDetail: "")
+
+        #expect(MenuBarTitle.suffix(for: match) == nil)
     }
 }
