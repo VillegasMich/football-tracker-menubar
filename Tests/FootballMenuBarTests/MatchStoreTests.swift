@@ -391,6 +391,28 @@ final class MatchStoreTests {
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
     }
 
+    @Test("A pin saved without its Competition is restored from the Followed Competitions, and its Competition is saved once found")
+    func pinWithoutCompetitionRestoredFromFollowed() async {
+        defaults.set(arsenalChelsea.id, forKey: "pinnedMatchID")
+        defaults.set(dayKey(todayKickoff), forKey: "pinnedMatchDay")
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        let store = makeStore()
+
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.first == ["eng.1", "uefa.champions"])
+        #expect(store.pinnedSnapshot == arsenalChelsea)
+
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        let relaunched = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        await relaunched.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(relaunched.pinnedSnapshot == arsenalChelseaLive)
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -417,6 +439,14 @@ private let premierLeague = Competition(slug: "eng.1", displayName: "Premier Lea
 private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
 private let laLiga = Competition(slug: "esp.1", displayName: "LaLiga", region: .spain)
 private let worldCup = Competition(slug: "fifa.world", displayName: "World Cup", region: .fifa)
+
+/// A day as the store saves a pin's day: `yyyy-MM-dd`, local.
+private func dayKey(_ date: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.dateFormat = "yyyy-MM-dd"
+    return f.string(from: date)
+}
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
 /// each use, so it is today for whichever test reads it.

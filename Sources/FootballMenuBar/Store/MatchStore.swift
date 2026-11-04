@@ -423,7 +423,8 @@ final class MatchStore: ObservableObject {
     /// Only a successful fetch of the snapshot's own Competition decides: it
     /// replaces the snapshot, or clears it (⇒ ⚽) when the Match is no longer
     /// there. A failure of that Competition keeps the last snapshot. With no
-    /// snapshot yet, the Match is looked for in every Competition that loaded.
+    /// snapshot yet, the Match is looked for in every Competition that loaded;
+    /// once found, a pin saved without its Competition saves it from then on.
     private func updateSnapshot(from results: CompetitionResults, id: String, source: SnapshotSource) {
         if let snapshot = pinnedSnapshot {
             guard case .success(let fetched)? = results[snapshot.competitionSlug] else { return }
@@ -432,7 +433,12 @@ final class MatchStore: ObservableObject {
             let found = results.values.lazy
                 .compactMap { try? $0.get().first { $0.id == id } }
                 .first
-            if let found { setPinnedSnapshot(found, source: source) }
+            guard let found else { return }
+            setPinnedSnapshot(found, source: source)
+            if pinnedCompetitionSlug == nil {
+                pinnedCompetitionSlug = found.competitionSlug
+                persistPin()
+            }
         }
     }
 
