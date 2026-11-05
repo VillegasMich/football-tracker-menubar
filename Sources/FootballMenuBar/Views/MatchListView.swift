@@ -106,6 +106,10 @@ struct MatchListView: View {
             // Set only when every Competition failed with nothing loaded.
             if let error = store.errorMessage {
                 errorState(error)
+            } else if groups.isEmpty, !store.hasLoadedOnce {
+                // The list first loads when the popover first opens, so it
+                // says so rather than "No matches" until that fetch lands.
+                loadingState
             } else if groups.isEmpty {
                 emptyState
             } else {
@@ -171,6 +175,15 @@ struct MatchListView: View {
                     .buttonStyle(.borderless)
             }
         }
+        .padding(.vertical, 8)
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text("Loading matches…").font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
     }
 
