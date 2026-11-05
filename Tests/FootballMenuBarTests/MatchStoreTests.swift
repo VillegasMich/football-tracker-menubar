@@ -10,6 +10,10 @@ final class MatchStoreTests {
     private let suiteName = "MatchStoreTests.\(UUID().uuidString)"
     private let defaults: UserDefaults
     private let provider = FakeMatchDataProvider()
+    /// The time the store sees: noon on `clockStartDay`, unless a test moves it.
+    private let clock = TestClock(clockStartDay.addingTimeInterval(12 * 3600))
+    /// The store's clock, read from `clock`.
+    private var now: @MainActor () -> Date { { [clock] in clock.now } }
 
     init() {
         defaults = UserDefaults(suiteName: suiteName)!
@@ -26,7 +30,8 @@ final class MatchStoreTests {
         return MatchStore(provider: provider,
                           defaults: defaults,
                           settings: settings,
-                          notifier: nil)
+                          notifier: nil,
+                          now: now)
     }
 
     // MARK: - Followed Competitions
@@ -34,7 +39,8 @@ final class MatchStoreTests {
     @Test("On first launch the Followed Competitions are the three defaults, and only they are requested")
     func firstLaunchFollowsDefaults() async {
         let store = MatchStore(provider: provider, defaults: defaults,
-                               settings: AppSettings(defaults: defaults), notifier: nil)
+                               settings: AppSettings(defaults: defaults), notifier: nil,
+                               now: now)
 
         await store.loadInitial()
 
@@ -391,6 +397,26 @@ final class MatchStoreTests {
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
     }
 
+    @Test("A pin of an unfollowed Competition is requested on ticks during its day, and no longer once the clock passes midnight")
+    func clockPassingMidnightStopsRequestingUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+
+        await store.tick()
+        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+
+        clock.now = Calendar.current.date(byAdding: .day, value: 1, to: clockStartDay)!
+            .addingTimeInterval(60)
+        await store.tick()
+
+        #expect(provider.requestedSlugs.last == ["uefa.champions"])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+    }
+
     @Test("After a relaunch, the restore requests a past-day Pinned Match's unfollowed Competition once, so the snapshot shows its last state, while ticks don't")
     func relaunchRestoresPastDayPinOfUnfollowedCompetition() async {
         let first = makeStore()
@@ -503,11 +529,12 @@ private func dayKey(_ date: Date) -> String {
     return formatter.string(from: date)
 }
 
-/// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
-/// each use, so it is today for whichever test reads it.
-private var todayKickoff: Date {
-    Calendar.current.startOfDay(for: Date()).addingTimeInterval(20 * 3600)
-}
+/// The day the tests' clock starts on, the store's today: the start of
+/// 4 November 2026, local.
+private let clockStartDay = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 4))!
+
+/// Today's kickoff, so a Pinned Match's day is the browsed day.
+private let todayKickoff = clockStartDay.addingTimeInterval(20 * 3600)
 
 private var arsenalChelsea: Match {
     makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
