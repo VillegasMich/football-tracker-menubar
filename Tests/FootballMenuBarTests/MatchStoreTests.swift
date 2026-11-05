@@ -829,6 +829,22 @@ final class MatchStoreTests {
         #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"], ["eng.1", "uefa.champions"]])
     }
 
+    @Test("Opening the popover while the list is being refreshed still requests every Followed Competition, once that fetch lands")
+    func openingDuringRefreshStillRefreshes() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        store.popoverClosed()
+        provider.holdNextRequest()
+        let inFlight = Task { await store.refresh() }
+        await provider.heldRequestArrived()
+
+        await openPopover(store)
+        provider.releaseHeldRequest()
+        await inFlight.value
+
+        #expect(provider.requestedSlugs == Array(repeating: ["eng.1", "uefa.champions"], count: 3))
+    }
+
     @Test("Opening the popover on another day returns the list to today, loading it in one fetch")
     func openingOnAnotherDayReturnsToToday() async {
         let store = makeStore()

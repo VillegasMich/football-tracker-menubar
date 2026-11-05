@@ -99,8 +99,9 @@ final class MatchStore: ObservableObject {
     /// The refresh started by the latest opening of the popover; awaitable so
     /// tests can wait for it.
     private(set) var popoverOpenedRefresh: Task<Void, Never>?
-    /// Set when the Followed Competitions change during a refresh, so that
-    /// refresh runs once more with them instead of the change being dropped.
+    /// Set when the Followed Competitions change, or the popover opens, during
+    /// a refresh, so that refresh runs once more in full instead of the change
+    /// or the open being dropped.
     private var refreshPending = false
 
     /// Which feed a refresh served: the browse feed or the ticker feed.
@@ -332,10 +333,14 @@ final class MatchStore: ObservableObject {
         isPopoverOpen = true
         popoverOpenedRefresh = Task { [weak self] in
             guard let self else { return }
-            if self.isViewingToday {
-                await self.refresh()
-            } else {
+            if !self.isViewingToday {
                 await self.goToToday()
+            } else if self.isRefreshing {
+                // The fetch in flight may cover only some Competitions, or
+                // have started before the open: it runs once more in full.
+                self.refreshPending = true
+            } else {
+                await self.refresh()
             }
         }
     }
