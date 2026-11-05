@@ -10,8 +10,10 @@ final class MatchStoreTests {
     private let suiteName = "MatchStoreTests.\(UUID().uuidString)"
     private let defaults: UserDefaults
     private let provider = FakeMatchDataProvider()
-    /// The time the store sees: noon today, unless a test moves it.
-    private let clock = TestClock(today.addingTimeInterval(12 * 3600))
+    /// The time the store sees: noon on `clockStartDay`, unless a test moves it.
+    private let clock = TestClock(clockStartDay.addingTimeInterval(12 * 3600))
+    /// The store's clock, read from `clock`.
+    private var now: @MainActor () -> Date { { [clock] in clock.now } }
 
     init() {
         defaults = UserDefaults(suiteName: suiteName)!
@@ -29,7 +31,7 @@ final class MatchStoreTests {
                           defaults: defaults,
                           settings: settings,
                           notifier: nil,
-                          now: { [clock] in clock.now })
+                          now: now)
     }
 
     // MARK: - Followed Competitions
@@ -38,7 +40,7 @@ final class MatchStoreTests {
     func firstLaunchFollowsDefaults() async {
         let store = MatchStore(provider: provider, defaults: defaults,
                                settings: AppSettings(defaults: defaults), notifier: nil,
-                               now: { [clock] in clock.now })
+                               now: now)
 
         await store.loadInitial()
 
@@ -407,7 +409,8 @@ final class MatchStoreTests {
         #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == arsenalChelseaLive)
 
-        clock.advance(by: 12 * 3600 + 60)
+        clock.now = Calendar.current.date(byAdding: .day, value: 1, to: clockStartDay)!
+            .addingTimeInterval(60)
         await store.tick()
 
         #expect(provider.requestedSlugs.last == ["uefa.champions"])
@@ -526,11 +529,12 @@ private func dayKey(_ date: Date) -> String {
     return formatter.string(from: date)
 }
 
-/// The day the tests' clock starts on: the start of 4 November 2026, local.
-private let today = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 4))!
+/// The day the tests' clock starts on, the store's today: the start of
+/// 4 November 2026, local.
+private let clockStartDay = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 4))!
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day.
-private let todayKickoff = today.addingTimeInterval(20 * 3600)
+private let todayKickoff = clockStartDay.addingTimeInterval(20 * 3600)
 
 private var arsenalChelsea: Match {
     makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
