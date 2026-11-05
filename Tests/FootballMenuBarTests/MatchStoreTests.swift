@@ -46,10 +46,16 @@ final class MatchStoreTests {
         return Array(provider.requestedSlugs.dropFirst(before))
     }
 
+    /// Opens the popover of `store` and waits for the refresh it starts.
+    private func openPopover(_ store: MatchStore) async {
+        store.popoverOpened()
+        await store.popoverOpenedRefresh?.value
+    }
+
     /// Launches `store`, then opens the popover, which loads the list.
     private func launchAndOpen(_ store: MatchStore) async {
         await store.loadInitial()
-        await store.popoverOpened()
+        await openPopover(store)
     }
 
     // MARK: - Followed Competitions
@@ -162,7 +168,7 @@ final class MatchStoreTests {
         #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"]])
         #expect(store.matches == [arsenalChelsea])
 
-        await store.popoverOpened()
+        await openPopover(store)
 
         #expect(provider.requestedSlugs.last == ["eng.1", "esp.1"])
         #expect(store.matches == [arsenalChelsea, barcelonaRealMadrid])
@@ -429,7 +435,7 @@ final class MatchStoreTests {
         store.pin(yesterdayArsenalChelsea)
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
-        await store.popoverOpened()
+        await openPopover(store)
 
         clock.advance(by: idleRate)
         await store.tick()
@@ -445,7 +451,7 @@ final class MatchStoreTests {
         store.pin(arsenalChelsea)
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
-        await store.popoverOpened()
+        await openPopover(store)
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
 
         clock.advance(by: idleRate)
@@ -521,7 +527,7 @@ final class MatchStoreTests {
         store.pin(arsenalChelsea)
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
-        await store.popoverOpened()
+        await openPopover(store)
 
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.succeed(championsLeague, with: [parisBayern])
@@ -805,7 +811,7 @@ final class MatchStoreTests {
         provider.succeed(premierLeague, with: [arsenalChelsea])
         await store.loadInitial()
 
-        await store.popoverOpened()
+        await openPopover(store)
 
         #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"]])
         #expect(store.matches == [arsenalChelsea])
@@ -818,7 +824,7 @@ final class MatchStoreTests {
         store.popoverClosed()
         clock.advance(by: 10)
 
-        await store.popoverOpened()
+        await openPopover(store)
 
         #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"], ["eng.1", "uefa.champions"]])
     }
@@ -830,7 +836,7 @@ final class MatchStoreTests {
         await store.stepDay(by: 1)
         store.popoverClosed()
 
-        await store.popoverOpened()
+        await openPopover(store)
 
         #expect(store.isViewingToday)
         #expect(provider.requestedSlugs == Array(repeating: ["eng.1", "uefa.champions"], count: 3))

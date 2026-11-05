@@ -288,7 +288,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func anyWindowBecameKey(_ notification: Notification) {
         guard isPopoverWindow(notification.object) else { return }
-        Task { await store.popoverOpened() }
+        store.popoverOpened()
     }
 
     @objc private func anyWindowResignedKey(_ notification: Notification) {

@@ -8,10 +8,12 @@ import Combine
 ///
 /// It maintains two logically separate feeds:
 /// - the **browse feed** (`matches`) for `selectedDate`, powering the popover.
-///   Each Competition loads independently: one that fails keeps its last
-///   Matches for that day, and its load status says so;
+///   It is refreshed only while the popover is open, and straight away when
+///   it opens. Each Competition loads independently: one that fails keeps its
+///   last Matches for that day, and its load status says so;
 /// - the **ticker feed** (`pinnedSnapshot`) for the pinned match, powering the
-///   menu bar title independently of which day is browsed.
+///   menu bar title independently of which day is browsed, and whether the
+///   popover is open.
 ///
 /// Uses `ObservableObject` rather than the `@Observable` macro to keep the
 /// macOS 13 deployment floor (the macro requires macOS 14).
@@ -94,6 +96,9 @@ final class MatchStore: ObservableObject {
     /// The refresh started by the latest change of the Followed Competitions;
     /// awaitable so tests can wait for it.
     private(set) var followedCompetitionsRefresh: Task<Void, Never>?
+    /// The refresh started by the latest opening of the popover; awaitable so
+    /// tests can wait for it.
+    private(set) var popoverOpenedRefresh: Task<Void, Never>?
     /// Set when the Followed Competitions change during a refresh, so that
     /// refresh runs once more with them instead of the change being dropped.
     private var refreshPending = false
@@ -320,14 +325,18 @@ final class MatchStore: ObservableObject {
     /// The popover was opened: the list is refreshed straight away, in one
     /// fetch of every Followed Competition, on today. A day other than today
     /// returns to today, which loads it. Repeated while it's open, it does
-    /// nothing.
-    func popoverOpened() async {
+    /// nothing. The popover counts as open at once, so a close that follows
+    /// straight after isn't overtaken by it.
+    func popoverOpened() {
         guard !isPopoverOpen else { return }
         isPopoverOpen = true
-        if isViewingToday {
-            await refresh()
-        } else {
-            await goToToday()
+        popoverOpenedRefresh = Task { [weak self] in
+            guard let self else { return }
+            if self.isViewingToday {
+                await self.refresh()
+            } else {
+                await self.goToToday()
+            }
         }
     }
 
@@ -488,13 +497,11 @@ final class MatchStore: ObservableObject {
     /// with a Live Match that day.
     private var browseSchedule: [ScheduledRefresh] {
         guard isPopoverOpen else { return [] }
-        let refreshed = isViewingToday
-            ? followedCompetitions
-            : followedCompetitions.filter { browseMatches(of: $0.slug).contains(where: \.isLive) }
-        return refreshed.map { competition in
-            let usesLiveRate = wantsLiveRate(browseMatches(of: competition.slug))
+        return followedCompetitions.compactMap { competition in
+            let known = browseMatches(of: competition.slug)
+            guard isViewingToday || known.contains(where: \.isLive) else { return nil }
             return (competition, dueAt(RefreshKey(feed: .browse, slug: competition.slug, day: selectedDate),
-                                       usesLiveRate: usesLiveRate))
+                                       usesLiveRate: wantsLiveRate(known)))
         }
     }
 
