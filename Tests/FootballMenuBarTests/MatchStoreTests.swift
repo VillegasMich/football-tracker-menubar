@@ -46,6 +46,12 @@ final class MatchStoreTests {
         return Array(provider.requestedSlugs.dropFirst(before))
     }
 
+    /// Launches `store`, then opens the popover, which loads the list.
+    private func launchAndOpen(_ store: MatchStore) async {
+        await store.loadInitial()
+        await store.popoverOpened()
+    }
+
     // MARK: - Followed Competitions
 
     @Test("On first launch the Followed Competitions are the three defaults, and only they are requested")
@@ -54,7 +60,7 @@ final class MatchStoreTests {
                                settings: AppSettings(defaults: defaults), notifier: nil,
                                now: now)
 
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         #expect(store.settings.followedCompetitions.map(\.displayName)
                 == ["Premier League", "Champions League", "World Cup"])
@@ -114,7 +120,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         provider.succeed(laLiga, with: [barcelonaRealMadrid])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         store.settings.follow(laLiga)
         await store.followedCompetitionsRefresh?.value
@@ -129,7 +135,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         store.settings.unfollow(championsLeague)
 
@@ -140,6 +146,28 @@ final class MatchStoreTests {
         #expect(store.matches == [arsenalChelsea])
     }
 
+    @Test("With the popover closed, changing the Followed Competitions removes unfollowed Matches but requests nothing, and the next open loads them all")
+    func followingWhileClosedRequestsNothing() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        provider.succeed(championsLeague, with: [parisBayern])
+        provider.succeed(laLiga, with: [barcelonaRealMadrid])
+        await launchAndOpen(store)
+        store.popoverClosed()
+
+        store.settings.unfollow(championsLeague)
+        store.settings.follow(laLiga)
+        await store.followedCompetitionsRefresh?.value
+
+        #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"]])
+        #expect(store.matches == [arsenalChelsea])
+
+        await store.popoverOpened()
+
+        #expect(provider.requestedSlugs.last == ["eng.1", "esp.1"])
+        #expect(store.matches == [arsenalChelsea, barcelonaRealMadrid])
+    }
+
     @Test("Sections are listed in catalogue order, regardless of follow order")
     func sectionsInCatalogueOrder() async {
         let store = makeStore()
@@ -147,7 +175,7 @@ final class MatchStoreTests {
         provider.succeed(championsLeague, with: [parisBayern])
         provider.succeed(worldCup, with: [brazilFrance])
         provider.succeed(laLiga, with: [barcelonaRealMadrid])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         store.settings.follow(worldCup)
         await store.followedCompetitionsRefresh?.value
@@ -165,7 +193,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         provider.fail(premierLeague)
         provider.succeed(championsLeague, with: [parisBayernLive])
@@ -184,7 +212,7 @@ final class MatchStoreTests {
         provider.fail(premierLeague)
         provider.succeed(championsLeague, with: [parisBayern])
 
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         let sections = store.matchesByCompetition
         #expect(sections.map(\.competition) == [premierLeague, championsLeague])
@@ -197,7 +225,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         provider.fail(championsLeague)
-        await store.loadInitial()
+        await launchAndOpen(store)
         provider.fail(premierLeague)
         await store.refresh()
 
@@ -215,7 +243,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         provider.succeed(championsLeague, with: [])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         provider.fail(championsLeague)
         await store.refresh()
@@ -232,7 +260,7 @@ final class MatchStoreTests {
         provider.fail(premierLeague)
         provider.fail(championsLeague)
 
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         #expect(store.errorMessage == "Couldn't reach the scores service.")
         #expect(store.matches.isEmpty)
@@ -242,7 +270,7 @@ final class MatchStoreTests {
     func noFullScreenErrorWithStaleMatches() async {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         provider.fail(premierLeague)
         provider.fail(championsLeague)
@@ -258,7 +286,7 @@ final class MatchStoreTests {
         provider.fail(premierLeague)
         provider.succeed(championsLeague, with: [])
 
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         #expect(store.errorMessage == nil)
         #expect(store.matchesByCompetition.map(\.status) == [.failedToLoad])
@@ -269,7 +297,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.fail(premierLeague)
         provider.fail(championsLeague)
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         provider.succeed(premierLeague, with: [arsenalChelsea])
         await store.refresh()
@@ -355,9 +383,9 @@ final class MatchStoreTests {
 
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
-        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(provider.requestedSlugs == [["eng.1"], ["uefa.champions"]])
         #expect(store.pinnedMatchID == arsenalChelsea.id)
         #expect(store.pinnedSnapshot == arsenalChelseaLive)
         #expect(store.matches == [parisBayern])
@@ -374,9 +402,9 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
-        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(provider.requestedSlugs == [["eng.1"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == arsenalChelseaLive)
         #expect(store.matches == [parisBayern])
     }
@@ -389,10 +417,10 @@ final class MatchStoreTests {
         await store.followedCompetitionsRefresh?.value
 
         store.unpin()
-        await store.loadInitial()
-        await makeStore().loadInitial()
+        await launchAndOpen(store)
+        await launchAndOpen(makeStore())
 
-        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"]])
     }
 
     @Test("Once the Pinned Match's day is over, its unfollowed Competition is no longer requested, and the snapshot keeps its last value")
@@ -401,6 +429,7 @@ final class MatchStoreTests {
         store.pin(yesterdayArsenalChelsea)
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
+        await store.popoverOpened()
 
         clock.advance(by: idleRate)
         await store.tick()
@@ -416,6 +445,7 @@ final class MatchStoreTests {
         store.pin(arsenalChelsea)
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
+        await store.popoverOpened()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
 
         clock.advance(by: idleRate)
@@ -438,9 +468,9 @@ final class MatchStoreTests {
 
         let store = makeStore()
         provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
-        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
 
         clock.advance(by: idleRate)
@@ -465,9 +495,9 @@ final class MatchStoreTests {
         await store.followedCompetitionsRefresh?.value
         let relaunched = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
-        await relaunched.loadInitial()
+        await launchAndOpen(relaunched)
 
-        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
         #expect(relaunched.pinnedSnapshot == arsenalChelseaLive)
     }
 
@@ -482,7 +512,7 @@ final class MatchStoreTests {
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
 
-        #expect(await tickRequests(makeStore()) == [["uefa.champions"]])
+        #expect(await tickRequests(makeStore()) == [])
     }
 
     @Test("A refresh tick while browsing the pinned day still fetches the unfollowed Pinned Match's Competition, alone, for the ticker")
@@ -491,6 +521,7 @@ final class MatchStoreTests {
         store.pin(arsenalChelsea)
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
+        await store.popoverOpened()
 
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.succeed(championsLeague, with: [parisBayern])
@@ -508,7 +539,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         clock.advance(by: liveRate)
         #expect(await tickRequests(store) == [["eng.1"]])
@@ -522,7 +553,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         clock.now = todayKickoff.addingTimeInterval(-10 * 60)
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         clock.now = todayKickoff.addingTimeInterval(-5 * 60 - 1)
         #expect(await tickRequests(store) == [])
@@ -547,7 +578,7 @@ final class MatchStoreTests {
     func abandonedMatchWindow() async {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
-        await store.loadInitial()
+        await launchAndOpen(store)
         let lastSeenLive = clock.now
 
         provider.succeed(premierLeague, with: [arsenalChelseaAbandoned])
@@ -568,7 +599,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.fail(championsLeague)
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         provider.fail(premierLeague)
         clock.advance(by: liveRate)
@@ -601,7 +632,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
         store.pin(yesterdayArsenalChelsea)
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         clock.advance(by: idleRate)
 
@@ -612,7 +643,7 @@ final class MatchStoreTests {
     func pinningOnBrowsedDayKeepsItsRate() async {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea, tottenhamWestHamLive])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         store.pin(arsenalChelsea)
         #expect(await tickRequests(store) == [])
@@ -627,7 +658,7 @@ final class MatchStoreTests {
         defaults.set(dayKey(yesterdayArsenalChelsea.kickoff), forKey: pinnedMatchDayKey)
         provider.fail(premierLeague)
         let store = makeStore()
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         clock.advance(by: idleRate)
 
@@ -649,7 +680,7 @@ final class MatchStoreTests {
     @Test("A change of the Refresh setting takes effect at the next refresh step")
     func refreshSettingChangeTakesEffect() async {
         let store = makeStore()
-        await store.loadInitial()
+        await launchAndOpen(store)
         let aggressiveIdleRate = TimeInterval(RefreshCadence.aggressive.idleInterval) / 1_000_000_000
 
         clock.advance(by: aggressiveIdleRate)
@@ -666,7 +697,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         clock.now = todayKickoff.addingTimeInterval(-8 * 60)
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         #expect(store.nextRefreshDelay() == 3 * 60)
     }
@@ -675,7 +706,7 @@ final class MatchStoreTests {
     func wakesWhenNextCompetitionIsDue() async {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
-        await store.loadInitial()
+        await launchAndOpen(store)
         #expect(store.nextRefreshDelay() == liveRate)
 
         clock.advance(by: 10)
@@ -691,7 +722,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelseaTBD])
         clock.now = todayKickoff.addingTimeInterval(-idleRate + 60)
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         for minutes in [-5.0, 0, 1] {
             clock.now = todayKickoff.addingTimeInterval(minutes * 60 - 1)
@@ -702,6 +733,137 @@ final class MatchStoreTests {
         #expect(await tickRequests(store) == [["eng.1", "uefa.champions"]])
     }
 
+    // MARK: - Refreshing only what's visible
+
+    @Test("At launch, with the popover closed and no Pinned Match, nothing is requested")
+    func launchWithoutPinRequestsNothing() async {
+        let store = makeStore()
+
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs == [])
+    }
+
+    @Test("At launch, with the popover closed, only the Pinned Match's Competition is requested")
+    func launchWithPinRequestsOnlyItsCompetition() async {
+        makeStore().pin(arsenalChelsea)
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs == [["eng.1"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("With the popover closed and no Pinned Match, refresh steps request nothing")
+    func closedWithoutPinRequestsNothing() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        await launchAndOpen(store)
+        store.popoverClosed()
+
+        clock.advance(by: idleRate)
+
+        #expect(await tickRequests(store) == [])
+    }
+
+    @Test("With the popover closed, refresh steps request only the Pinned Match's Competition, at its rate")
+    func closedWithPinRequestsOnlyItsCompetition() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await launchAndOpen(store)
+        store.pin(arsenalChelseaLive)
+        store.popoverClosed()
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.advance(by: idleRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("With the popover closed, refresh steps request an unfollowed Pinned Match's Competition alone")
+    func closedWithUnfollowedPinRequestsOnlyItsCompetition() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+
+        clock.advance(by: idleRate)
+
+        #expect(await tickRequests(store) == [["eng.1"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("Opening the popover on today requests every Followed Competition straight away, in one fetch")
+    func openingOnTodayRefreshesOnce() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await store.loadInitial()
+
+        await store.popoverOpened()
+
+        #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"]])
+        #expect(store.matches == [arsenalChelsea])
+    }
+
+    @Test("Opening the popover again requests every Followed Competition again, whatever their rates")
+    func reopeningRefreshesImmediately() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        store.popoverClosed()
+        clock.advance(by: 10)
+
+        await store.popoverOpened()
+
+        #expect(provider.requestedSlugs == [["eng.1", "uefa.champions"], ["eng.1", "uefa.champions"]])
+    }
+
+    @Test("Opening the popover on another day returns the list to today, loading it in one fetch")
+    func openingOnAnotherDayReturnsToToday() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        await store.stepDay(by: 1)
+        store.popoverClosed()
+
+        await store.popoverOpened()
+
+        #expect(store.isViewingToday)
+        #expect(provider.requestedSlugs == Array(repeating: ["eng.1", "uefa.champions"], count: 3))
+    }
+
+    @Test("With the popover open on another day, refresh steps request only the Competitions with a Live Match that day")
+    func anotherDayRefreshesOnlyLiveCompetitions() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await launchAndOpen(store)
+        await store.stepDay(by: 1)
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.advance(by: idleRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+    }
+
+    @Test("With the popover open on another day, refresh steps also request the Pinned Match's Competition")
+    func anotherDayAlsoRefreshesPinnedCompetition() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        await launchAndOpen(store)
+        await store.stepDay(by: 1)
+        store.pin(barcelonaRealMadrid)
+
+        clock.advance(by: idleRate)
+
+        #expect(await tickRequests(store) == [["esp.1"], ["eng.1"]])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -709,7 +871,7 @@ final class MatchStoreTests {
         let store = makeStore()
         provider.succeed(premierLeague, with: [arsenalChelsea])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.loadInitial()
+        await launchAndOpen(store)
 
         provider.fail(premierLeague)
         await store.stepDay(by: 1)
