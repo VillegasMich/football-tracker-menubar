@@ -30,8 +30,12 @@ surfaces scores, kickoff times, and live match minutes at a glance.
   World Cup, Premier League and Champions League are followed out of the box
 - **Custom team abbreviations** — right-click any team to set your own
   abbreviation, used wherever a crest isn't available
-- **Configurable refresh cadence** — Battery Saver, Balanced, or Aggressive
-  polling presets
+- **Refresh setting** — Battery Saver, Balanced, or Aggressive. Each
+  Competition refreshes at its own rate: the Live rate while something in it
+  is changing or about to, the Idle rate otherwise. With the popover closed,
+  only the Pinned Match's Competition is refreshed (nothing without a pin);
+  opening the popover, waking the Mac or reconnecting to the network
+  refreshes straight away
 - **Zero Dock footprint** — runs as a background `.accessory` app
 
 ## Requirements
@@ -119,8 +123,8 @@ is a Dock-less accessory, so there's no Dock menu). It offers:
   Off by default. The switch reflects **System Settings → General → Login
   Items**, so removing the entry there turns it off here too, and the app never
   re-adds itself on its own
-- **Update frequency** — pick a refresh cadence preset (Battery Saver /
-  Balanced / Aggressive); each maps to a bounded live/idle poll interval
+- **Update frequency** — pick a Refresh setting (Battery Saver / Balanced /
+  Aggressive); each sets a Live rate and an Idle rate
 - **Menu bar live indicator** — show a red pill on the pinned match's menu bar
   title while it's live, optionally including the match minute
 
@@ -137,7 +141,7 @@ across relaunches.
 | `Sources/FootballMenuBar/Views/MatchListView.swift` | The popover: match rows, footer controls, and the abbreviation context menu |
 | `Sources/FootballMenuBar/Views/SettingsView.swift` | The Settings window contents |
 | `Sources/FootballMenuBar/Settings/AppSettings.swift` | Persisted, observable user configuration |
-| `Sources/FootballMenuBar/Store/MatchStore.swift` | Match data store and the state-driven refresh loop |
+| `Sources/FootballMenuBar/Store/MatchStore.swift` | Match data store and the refresh loop: each Competition at its own rate, only what's visible or pinned |
 | `Sources/FootballMenuBar/Services/ESPNProvider.swift` | Fetches live match data from ESPN's scoreboard API |
 | `Sources/FootballMenuBar/Models/Competition.swift` | The catalogue of 37 Competitions, grouped by region, and the default Followed Competitions |
 
