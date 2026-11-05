@@ -67,6 +67,12 @@ final class SettingsWindowManager: NSObject, ObservableObject, NSWindowDelegate 
         window?.close()
     }
 
+    /// True when `window` is the settings window, so the app can tell it
+    /// apart from the popover's.
+    func isSettingsWindow(_ window: NSWindow) -> Bool {
+        window === self.window
+    }
+
     private func bringToFront(_ window: NSWindow) {
         window.makeKeyAndOrderFront(nil)
         // `orderFrontRegardless` surfaces the window even when the accessory app

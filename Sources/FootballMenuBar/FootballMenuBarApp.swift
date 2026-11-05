@@ -263,23 +263,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // than contradicted. Deliberately does not register or unregister.
         launchAtLogin.reconcile()
 
-        // Reset the browsed day to today every time the popover opens. SwiftUI's
-        // `.onAppear` fires only when the `.window`-style MenuBarExtra content is
-        // first created (the window is reused across opens), so it can't do this.
-        // The popover is this accessory app's only window, so its window becoming
-        // key is a reliable "just opened" signal. `goToToday()` no-ops when
-        // already on today, so repeat/spurious fires are harmless.
+        // Tell the store when the popover opens and closes, so it refreshes
+        // only what's visible (and returns the list to today on open).
+        // SwiftUI's `.onAppear` fires only when the `.window`-style
+        // MenuBarExtra content is first created (the window is reused across
+        // opens), so it can't do this. Instead the popover's window becoming
+        // key means "just opened" and resigning key means "closed". Besides
+        // the popover, the only window that can become key is the Settings
+        // window, which is told apart by `SettingsWindowManager` and ignored.
+        // The store ignores a repeated open, so a spurious fire is harmless.
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(popoverWindowBecameKey),
+            selector: #selector(anyWindowBecameKey(_:)),
             name: NSWindow.didBecomeKeyNotification,
+            object: nil)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(anyWindowResignedKey(_:)),
+            name: NSWindow.didResignKeyNotification,
             object: nil)
 
         store.start()
     }
 
-    @objc private func popoverWindowBecameKey() {
-        Task { await store.goToToday() }
+    @objc private func anyWindowBecameKey(_ notification: Notification) {
+        guard isPopoverWindow(notification.object) else { return }
+        Task { await store.popoverOpened() }
+    }
+
+    @objc private func anyWindowResignedKey(_ notification: Notification) {
+        guard isPopoverWindow(notification.object) else { return }
+        store.popoverClosed()
+    }
+
+    /// True for the MenuBarExtra popover's window: any window of this app
+    /// other than the Settings window.
+    private func isPopoverWindow(_ object: Any?) -> Bool {
+        guard let window = object as? NSWindow else { return false }
+        return !settingsWindow.isSettingsWindow(window)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
