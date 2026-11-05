@@ -620,6 +620,46 @@ final class MatchStoreTests {
         #expect(await tickRequests(store) == [["esp.1"]])
     }
 
+    @Test("A change of the Refresh setting takes effect at the next refresh step")
+    func refreshSettingChangeTakesEffect() async {
+        let store = makeStore()
+        await store.loadInitial()
+        let aggressiveIdleRate = TimeInterval(RefreshCadence.aggressive.idleInterval) / 1_000_000_000
+
+        clock.advance(by: aggressiveIdleRate)
+        #expect(await tickRequests(store) == [])
+
+        store.settings.cadence = .aggressive
+        #expect(await tickRequests(store) == [["eng.1", "uefa.champions"]])
+    }
+
+    // MARK: - The polling loop's wake-up
+
+    @Test("With everything on the Idle rate, the loop wakes no later than the start of a confirmed kickoff's 5-minute window")
+    func wakesForKickoffWindow() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        clock.now = todayKickoff.addingTimeInterval(-8 * 60)
+        await store.loadInitial()
+
+        #expect(store.nextRefreshDelay() == 3 * 60)
+    }
+
+    @Test("The loop wakes when the next Competition is due at its rate")
+    func wakesWhenNextCompetitionIsDue() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        await store.loadInitial()
+        #expect(store.nextRefreshDelay() == liveRate)
+
+        clock.advance(by: 10)
+        #expect(store.nextRefreshDelay() == liveRate - 10)
+
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await store.refresh()
+        #expect(store.nextRefreshDelay() == idleRate)
+    }
+
     @Test("An unconfirmed (\"TBD\") kickoff never puts its Competition on the Live rate")
     func unconfirmedKickoffStaysIdle() async {
         let store = makeStore()

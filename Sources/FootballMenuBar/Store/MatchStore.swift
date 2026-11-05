@@ -464,14 +464,29 @@ final class MatchStore: ObservableObject {
     }
 
     /// How long the polling loop waits before its next refresh step (internal,
-    /// not private, so tests can check it): until the next Competition is due,
-    /// and at most one Idle-rate interval, so a change that time alone brings,
-    /// such as the browsed day becoming today, is still noticed.
+    /// not private, so tests can check it): until the next Competition is due
+    /// at its rate, or a confirmed kickoff's window opens and changes a rate,
+    /// whichever comes first. At most one Idle-rate interval, so a change that
+    /// time alone brings, such as the browsed day becoming today, is still
+    /// noticed.
     func nextRefreshDelay() -> TimeInterval {
         let now = now()
         let idleRate = TimeInterval(settings.cadence.idleInterval) / 1_000_000_000
-        let nextDue = (browseSchedule + tickerSchedule).map(\.dueAt).min() ?? .distantFuture
-        let next = min(nextDue, now.addingTimeInterval(idleRate))
+        let browse = browseSchedule
+        let ticker = tickerSchedule
+        let nextDue = (browse + ticker).map(\.dueAt).min() ?? .distantFuture
+
+        var rateDeciders = browse.flatMap { browseMatches(of: $0.competition.slug) }
+        if !ticker.isEmpty {
+            rateDeciders += pinnedCompetitionMatches + (pinnedSnapshot.map { [$0] } ?? [])
+        }
+        let nextWindowOpens = rateDeciders
+            .filter { $0.state == .upcoming && $0.isKickoffConfirmed }
+            .map { $0.kickoff.addingTimeInterval(-Self.kickoffWindowBefore) }
+            .filter { $0 > now }
+            .min() ?? .distantFuture
+
+        let next = min(nextDue, nextWindowOpens, now.addingTimeInterval(idleRate))
         return max(next.timeIntervalSince(now), Self.minimumRefreshDelay)
     }
 
