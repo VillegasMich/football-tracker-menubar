@@ -181,6 +181,19 @@ final class MatchStore: ObservableObject {
         pinnedCompetitionMatches = []
         setPinnedSnapshot(match, source: .seed)
         persistPin()
+        adoptBrowseRefresh(ofPinnedCompetition: match.competitionSlug)
+    }
+
+    /// When the pinned day is browsed, the list's last fetch of the Pinned
+    /// Match's Competition also serves the ticker: its Matches give the
+    /// ticker's rate, and the ticker is next due when that fetch says.
+    private func adoptBrowseRefresh(ofPinnedCompetition slug: String) {
+        guard pinnedDayIsBrowsed else { return }
+        pinnedCompetitionMatches = browseMatches(of: slug)
+        let browseKey = RefreshKey(feed: .browse, slug: slug, day: selectedDate)
+        if let last = lastRefreshes[browseKey] {
+            lastRefreshes[RefreshKey(feed: .ticker, slug: slug, day: selectedDate)] = last
+        }
     }
 
     /// Clear the pin, leaving no match pinned.
@@ -236,14 +249,17 @@ final class MatchStore: ObservableObject {
         return pinnedCompetitionIfUnfollowed
     }
 
+    /// The slug of the Pinned Match's Competition, once known.
+    private var pinnedCompetitionSlug: String? {
+        pinnedMatchCompetitionSlug ?? pinnedSnapshot?.competitionSlug
+    }
+
     /// The Competitions the ticker fetch requests: the Pinned Match's own,
     /// unless it isn't followed and its day is over. A pin whose Competition
     /// isn't known yet is looked for among the Followed Competitions.
     private var tickerCompetitions: [Competition] {
         guard pinnedMatchID != nil else { return [] }
-        guard let slug = pinnedMatchCompetitionSlug ?? pinnedSnapshot?.competitionSlug else {
-            return followedCompetitions
-        }
+        guard let slug = pinnedCompetitionSlug else { return followedCompetitions }
         if let followed = followedCompetitions.first(where: { $0.slug == slug }) {
             return [followed]
         }
@@ -300,7 +316,7 @@ final class MatchStore: ObservableObject {
     private func stepLoad(_ target: Date) async {
         isSteppingDate = true
         defer { isSteppingDate = false }
-        await loadBrowse(for: target)
+        await loadBrowse(for: target, requesting: followedCompetitions)
     }
 
     // MARK: - Refresh loop
@@ -341,8 +357,10 @@ final class MatchStore: ObservableObject {
         if !tickerDue.isEmpty {
             await refreshTicker(requesting: tickerDue, source: .poll)
         }
-        if !browseDue.isEmpty {
-            await refresh(requesting: browseDue)
+        // The Followed Competitions may change during the ticker fetch.
+        let browseStillDue = browseDue.filter(followedCompetitions.contains)
+        if !browseStillDue.isEmpty {
+            await refresh(requesting: browseStillDue)
         }
     }
 
@@ -380,11 +398,10 @@ final class MatchStore: ObservableObject {
         } while refreshPending
     }
 
-    /// Load the browse feed for `target`, every Followed Competition unless
-    /// `requested` says otherwise. Results are discarded if the selected day
-    /// changed while the fetch was in flight (out-of-order guard).
-    private func loadBrowse(for target: Date, requesting requested: [Competition]? = nil) async {
-        let requested = requested ?? followedCompetitions
+    /// Load the browse feed of `requested` for `target`. Results are discarded
+    /// if the selected day changed while the fetch was in flight (out-of-order
+    /// guard).
+    private func loadBrowse(for target: Date, requesting requested: [Competition]) async {
         let requestedAt = now()
         let results = await provider.matches(for: requested, on: target)
         noteLiveMatches(in: results, at: requestedAt)
@@ -446,9 +463,9 @@ final class MatchStore: ObservableObject {
     private var browseSchedule: [ScheduledRefresh] {
         guard isViewingToday || hasLiveMatch else { return [] }
         return followedCompetitions.map { competition in
-            let liveRate = wantsLiveRate(browseMatches(of: competition.slug))
+            let usesLiveRate = wantsLiveRate(browseMatches(of: competition.slug))
             return (competition, dueAt(RefreshKey(feed: .browse, slug: competition.slug, day: selectedDate),
-                                       liveRate: liveRate))
+                                       usesLiveRate: usesLiveRate))
         }
     }
 
@@ -456,10 +473,10 @@ final class MatchStore: ObservableObject {
     /// Match's Competition's Matches give.
     private var tickerSchedule: [ScheduledRefresh] {
         let day = pinnedDay
-        let liveRate = wantsLiveRate(pinnedCompetitionMatches + (pinnedSnapshot.map { [$0] } ?? []))
+        let usesLiveRate = wantsLiveRate(pinnedCompetitionKnownMatches)
         return tickerCompetitions.map { competition in
             (competition, dueAt(RefreshKey(feed: .ticker, slug: competition.slug, day: day),
-                                liveRate: liveRate))
+                                usesLiveRate: usesLiveRate))
         }
     }
 
@@ -471,28 +488,32 @@ final class MatchStore: ObservableObject {
     /// noticed.
     func nextRefreshDelay() -> TimeInterval {
         let now = now()
-        let idleRate = TimeInterval(settings.cadence.idleInterval) / 1_000_000_000
         let browse = browseSchedule
         let ticker = tickerSchedule
         let nextDue = (browse + ticker).map(\.dueAt).min() ?? .distantFuture
 
         var rateDeciders = browse.flatMap { browseMatches(of: $0.competition.slug) }
         if !ticker.isEmpty {
-            rateDeciders += pinnedCompetitionMatches + (pinnedSnapshot.map { [$0] } ?? [])
+            rateDeciders += pinnedCompetitionKnownMatches
         }
         let nextWindowOpens = rateDeciders
-            .filter { $0.state == .upcoming && $0.isKickoffConfirmed }
-            .map { $0.kickoff.addingTimeInterval(-Self.kickoffWindowBefore) }
+            .compactMap(Self.kickoffWindowStart)
             .filter { $0 > now }
             .min() ?? .distantFuture
 
-        let next = min(nextDue, nextWindowOpens, now.addingTimeInterval(idleRate))
+        let next = min(nextDue, nextWindowOpens, now.addingTimeInterval(interval(usesLiveRate: false)))
         return max(next.timeIntervalSince(now), Self.minimumRefreshDelay)
     }
 
     /// The shortest wait between two refresh steps, so a Competition due
     /// straight away doesn't spin the loop.
     private static let minimumRefreshDelay: TimeInterval = 1
+
+    /// The Pinned Match's Competition's Matches on the pinned day as far as
+    /// the ticker knows them: its last fetch of them, and the snapshot.
+    private var pinnedCompetitionKnownMatches: [Match] {
+        pinnedCompetitionMatches + (pinnedSnapshot.map { [$0] } ?? [])
+    }
 
     /// The Competition's last-known Matches on the browsed day: none when it
     /// failed to load.
@@ -521,8 +542,8 @@ final class MatchStore: ObservableObject {
             case .inProgress:
                 return true
             case .upcoming:
-                return match.isKickoffConfirmed
-                    && match.kickoff.addingTimeInterval(-Self.kickoffWindowBefore) <= now
+                guard let windowStart = Self.kickoffWindowStart(of: match) else { return false }
+                return windowStart <= now
                     && now <= match.kickoff.addingTimeInterval(Self.kickoffWindowAfter)
             case .abandoned:
                 guard let seen = lastSeenLiveByMatchID[match.id] else { return false }
@@ -533,13 +554,25 @@ final class MatchStore: ObservableObject {
         }
     }
 
+    /// When an Upcoming Match's confirmed kickoff window opens; `nil` for any
+    /// other Match, an unconfirmed kickoff included.
+    private static func kickoffWindowStart(of match: Match) -> Date? {
+        guard match.state == .upcoming, match.isKickoffConfirmed else { return nil }
+        return match.kickoff.addingTimeInterval(-kickoffWindowBefore)
+    }
+
+    /// The current Refresh setting's Live rate or Idle rate, in seconds.
+    private func interval(usesLiveRate: Bool) -> TimeInterval {
+        let refreshSetting = settings.cadence
+        let nanoseconds = usesLiveRate ? refreshSetting.liveInterval : refreshSetting.idleInterval
+        return TimeInterval(nanoseconds) / 1_000_000_000
+    }
+
     /// When the Competition under `key` is next due: its rate's interval after
     /// its last refresh, or straight away if it has none.
-    private func dueAt(_ key: RefreshKey, liveRate: Bool) -> Date {
+    private func dueAt(_ key: RefreshKey, usesLiveRate: Bool) -> Date {
         guard let last = lastRefreshes[key] else { return .distantPast }
-        let refreshSetting = settings.cadence
-        let interval = liveRate ? refreshSetting.liveInterval : refreshSetting.idleInterval
-        return last.addingTimeInterval(TimeInterval(interval) / 1_000_000_000)
+        return last.addingTimeInterval(interval(usesLiveRate: usesLiveRate))
     }
 
     /// Remember which fetched Matches are Live at `time`, forgetting those
@@ -611,8 +644,7 @@ final class MatchStore: ObservableObject {
     /// then on, so the extra fetch of an unfollowed Competition can end.
     private func updateSnapshot(from results: CompetitionResults, id: String, source: SnapshotSource) {
         defer {
-            if let slug = pinnedMatchCompetitionSlug ?? pinnedSnapshot?.competitionSlug,
-               case .success(let fetched)? = results[slug] {
+            if let slug = pinnedCompetitionSlug, case .success(let fetched)? = results[slug] {
                 pinnedCompetitionMatches = fetched
             }
         }

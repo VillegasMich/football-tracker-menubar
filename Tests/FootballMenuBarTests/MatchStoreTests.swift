@@ -608,6 +608,32 @@ final class MatchStoreTests {
         #expect(await tickRequests(store) == [["eng.1"], ["eng.1", "uefa.champions"]])
     }
 
+    @Test("Pinning a Match on the browsed day doesn't request its Competition again before the list's next refresh of it")
+    func pinningOnBrowsedDayKeepsItsRate() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea, tottenhamWestHamLive])
+        await store.loadInitial()
+
+        store.pin(arsenalChelsea)
+        #expect(await tickRequests(store) == [])
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+    }
+
+    @Test("A pin whose Competition isn't known yet is looked for among the Followed Competitions by the ticker")
+    func legacyPinTickerFallsBackToFollowed() async {
+        defaults.set(yesterdayArsenalChelsea.id, forKey: pinnedMatchIDKey)
+        defaults.set(dayKey(yesterdayArsenalChelsea.kickoff), forKey: pinnedMatchDayKey)
+        provider.fail(premierLeague)
+        let store = makeStore()
+        await store.loadInitial()
+
+        clock.advance(by: idleRate)
+
+        #expect(await tickRequests(store) == [["eng.1", "uefa.champions"], ["eng.1", "uefa.champions"]])
+    }
+
     @Test("The ticker uses the Live rate while another Match of the Pinned Match's Competition that day is Live")
     func tickerRateFromItsCompetitionsMatches() async {
         let store = makeStore()
@@ -777,4 +803,12 @@ private var atleticoSevillaLive: Match {
               kickoff: todayKickoff.addingTimeInterval(-6 * 3600),
               home: Team(id: "1068", name: "Atlético Madrid", abbreviation: "ATM", logoURL: nil),
               away: Team(id: "243", name: "Sevilla", abbreviation: "SEV", logoURL: nil))
+}
+/// Another Premier League Match today, Live.
+private var tottenhamWestHamLive: Match {
+    makeMatch(id: "7", competitionSlug: "eng.1", state: .inProgress,
+              statusDetail: "70'", score: Score(home: 2, away: 2),
+              kickoff: todayKickoff.addingTimeInterval(-6 * 3600),
+              home: Team(id: "367", name: "Tottenham Hotspur", abbreviation: "TOT", logoURL: nil),
+              away: Team(id: "371", name: "West Ham United", abbreviation: "WHU", logoURL: nil))
 }
