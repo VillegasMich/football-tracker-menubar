@@ -46,6 +46,14 @@ final class MatchStoreTests {
         return Array(provider.requestedSlugs.dropFirst(before))
     }
 
+    /// Refreshes `store` now, as after waking or reconnecting, and returns the
+    /// requests it made, one array of slugs per request.
+    private func refreshNowRequests(_ store: MatchStore) async -> [[String]] {
+        let before = provider.requestedSlugs.count
+        await store.refreshNow()
+        return Array(provider.requestedSlugs.dropFirst(before))
+    }
+
     /// Opens the popover of `store` and waits for the refresh it starts.
     private func openPopover(_ store: MatchStore) async {
         store.popoverOpened()
@@ -884,6 +892,89 @@ final class MatchStoreTests {
         clock.advance(by: idleRate)
 
         #expect(await tickRequests(store) == [["esp.1"], ["eng.1"]])
+    }
+
+    // MARK: - Refreshing now (after waking or reconnecting)
+
+    @Test("Refreshing now with the popover open requests every Followed Competition, even straight after a refresh")
+    func refreshNowWithPopoverOpen() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await launchAndOpen(store)
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+
+        #expect(await refreshNowRequests(store) == [["eng.1", "uefa.champions"]])
+        #expect(store.matches == [arsenalChelseaLive])
+    }
+
+    @Test("Refreshing now with the popover closed requests only the Pinned Match's Competition, even straight after a refresh")
+    func refreshNowClosedWithPin() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await launchAndOpen(store)
+        store.pin(arsenalChelsea)
+        store.popoverClosed()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+
+        #expect(await refreshNowRequests(store) == [["eng.1"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("Refreshing now with the popover closed and no Pinned Match requests nothing")
+    func refreshNowClosedWithoutPin() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        store.popoverClosed()
+
+        #expect(await refreshNowRequests(store) == [])
+    }
+
+    @Test("Refreshing now with the popover open and a Pinned Match on the browsed day requests every Followed Competition in one fetch, which also serves the ticker")
+    func refreshNowOpenWithPinCoveredByList() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        await launchAndOpen(store)
+        store.pin(arsenalChelsea)
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+
+        #expect(await refreshNowRequests(store) == [["eng.1", "uefa.champions"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("Refreshing now with the popover open also requests an unfollowed Pinned Match's Competition, alone, for the ticker")
+    func refreshNowOpenWithUnfollowedPin() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        store.pin(barcelonaRealMadrid)
+
+        #expect(await refreshNowRequests(store) == [["esp.1"], ["eng.1", "uefa.champions"]])
+    }
+
+    @Test("Refreshing now counts as a refresh: the next refresh step waits out the rates from it")
+    func refreshNowCountsAsARefresh() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        store.pin(barcelonaRealMadrid)
+        clock.advance(by: idleRate)
+
+        await store.refreshNow()
+
+        #expect(await tickRequests(store) == [])
+    }
+
+    @Test("Refreshing now while the list is being refreshed still requests every Followed Competition, once that fetch lands")
+    func refreshNowDuringRefreshStillRefreshes() async {
+        let store = makeStore()
+        await launchAndOpen(store)
+        provider.holdNextRequest()
+        let inFlight = Task { await store.refresh() }
+        await provider.heldRequestArrived()
+
+        await store.refreshNow()
+        provider.releaseHeldRequest()
+        await inFlight.value
+
+        #expect(provider.requestedSlugs == Array(repeating: ["eng.1", "uefa.champions"], count: 3))
     }
 
     // MARK: - Browsed day

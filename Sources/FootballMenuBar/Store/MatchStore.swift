@@ -387,16 +387,38 @@ final class MatchStore: ObservableObject {
     ///   Competition.
     func tick() async {
         let now = now()
-        let browseDue = browseSchedule.filter { $0.dueAt <= now }.map(\.competition)
-        let coveredByBrowse = pinnedDayIsBrowsed ? Set(browseDue.map(\.slug)) : []
-        let tickerDue = tickerSchedule
-            .filter { $0.dueAt <= now && !coveredByBrowse.contains($0.competition.slug) }
-            .map(\.competition)
+        await refresh(browse: browseSchedule.filter { $0.dueAt <= now }.map(\.competition),
+                      ticker: tickerSchedule.filter { $0.dueAt <= now }.map(\.competition))
+    }
+
+    /// Refresh everything visible straight away, whatever the rates, as after
+    /// the Mac wakes or the network comes back: like a refresh step in which
+    /// every Competition is due.
+    /// - With the popover open, every Followed Competition on the browsed
+    ///   day, plus the Pinned Match's Competition for the ticker when that
+    ///   fetch doesn't cover it.
+    /// - With it closed, only the Pinned Match's Competition, or nothing
+    ///   without a Pinned Match.
+    ///
+    /// A list fetch in flight may have started before the wake or the
+    /// reconnection: it runs once more in full instead.
+    func refreshNow() async {
+        if isPopoverOpen, isRefreshing { refreshPending = true }
+        await refresh(browse: isPopoverOpen ? followedCompetitions : [],
+                      ticker: tickerCompetitions)
+    }
+
+    /// Fetch the `ticker` Competitions for the ticker, then the `browse`
+    /// ones for the list, one request per feed. The ticker skips a
+    /// Competition the browse fetch of the pinned day covers.
+    private func refresh(browse: [Competition], ticker: [Competition]) async {
+        let coveredByBrowse = pinnedDayIsBrowsed ? Set(browse.map(\.slug)) : []
+        let tickerDue = ticker.filter { !coveredByBrowse.contains($0.slug) }
         if !tickerDue.isEmpty {
             await refreshTicker(requesting: tickerDue, source: .poll)
         }
         // The Followed Competitions may change during the ticker fetch.
-        let browseStillDue = browseDue.filter(followedCompetitions.contains)
+        let browseStillDue = browse.filter(followedCompetitions.contains)
         if !browseStillDue.isEmpty {
             await refresh(requesting: browseStillDue)
         }
