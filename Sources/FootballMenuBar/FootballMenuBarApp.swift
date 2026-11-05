@@ -269,8 +269,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // MenuBarExtra content is first created (the window is reused across
         // opens), so it can't do this. Instead the popover's window becoming
         // key means "just opened" and resigning key means "closed". Besides
-        // the popover, the only window that can become key is the Settings
-        // window, which is told apart by `SettingsWindowManager` and ignored.
+        // the popover, the windows that can become key are the Settings
+        // window (told apart by `SettingsWindowManager`) and alerts, such as
+        // the popover's own "Team abbreviation" one (a sheet or modal window);
+        // both are ignored, and an alert over the popover doesn't close it.
         // The store ignores a repeated open, so a spurious fire is harmless.
         NotificationCenter.default.addObserver(
             self,
@@ -293,14 +295,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func anyWindowResignedKey(_ notification: Notification) {
         guard isPopoverWindow(notification.object) else { return }
+        // Handing key to its own alert leaves the popover open.
+        guard let window = notification.object as? NSWindow,
+              window.attachedSheet == nil, NSApp.modalWindow == nil
+        else { return }
         store.popoverClosed()
     }
 
     /// True for the MenuBarExtra popover's window: any window of this app
-    /// other than the Settings window.
+    /// other than the Settings window and alerts (sheets and modal windows).
     private func isPopoverWindow(_ object: Any?) -> Bool {
         guard let window = object as? NSWindow else { return false }
         return !settingsWindow.isSettingsWindow(window)
+            && window.sheetParent == nil
+            && window !== NSApp.modalWindow
     }
 
     func applicationWillTerminate(_ notification: Notification) {
