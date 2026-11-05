@@ -67,3 +67,17 @@ _Avoid_: provider, API
 **Backup Source**:
 A secondary data source read for a Competition only when the Primary Source fails for it, and never mixed with Primary Source data.
 _Avoid_: fallback provider, mirror
+
+## Refreshing
+
+**Refresh setting**:
+The user's chosen preset (Battery Saver, Balanced or Aggressive) that sets the Live rate and the Idle rate.
+_Avoid_: cadence, update frequency (except as the Settings label), polling mode
+
+**Live rate**:
+The short interval of the Refresh setting, used for a Competition while something in it is changing or about to change.
+_Avoid_: fast poll, live cadence, fast mode
+
+**Idle rate**:
+The long interval of the Refresh setting, used for a Competition while nothing in it is expected to change.
+_Avoid_: slow poll, idle cadence, slow mode
