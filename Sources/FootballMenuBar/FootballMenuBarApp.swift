@@ -253,6 +253,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                     store: store,
                                                     launchAtLogin: launchAtLogin)
 
+    /// Refreshes straight away when the network comes back, rather than
+    /// waiting out the rates. A network already available at launch
+    /// triggers nothing.
+    private lazy var networkRecovery = NetworkRecoveryMonitor { [weak self] in
+        self?.refreshNow()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // `.accessory` keeps the app out of the Dock and the app switcher,
         // so it lives only in the menu bar.
@@ -285,7 +292,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.didResignKeyNotification,
             object: nil)
 
+        // After the Mac wakes from sleep or the network comes back, what is
+        // shown may be a whole interval old: refresh what's visible straight
+        // away, whatever the rates.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(macDidWake(_:)),
+            name: NSWorkspace.didWakeNotification,
+            object: nil)
+        networkRecovery.start()
+
         store.start()
+    }
+
+    @objc private func macDidWake(_ notification: Notification) {
+        refreshNow()
+    }
+
+    /// Refresh everything visible or pinned straight away (see
+    /// `MatchStore.refreshNow()`).
+    private func refreshNow() {
+        Task { await store.refreshNow() }
     }
 
     @objc private func anyWindowBecameKey(_ notification: Notification) {
@@ -312,6 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        networkRecovery.cancel()
         store.stop()
     }
 }
