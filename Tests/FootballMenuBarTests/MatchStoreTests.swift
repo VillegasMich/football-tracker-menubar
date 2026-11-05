@@ -517,6 +517,68 @@ final class MatchStoreTests {
         #expect(await tickRequests(store) == [["eng.1", "uefa.champions"]])
     }
 
+    @Test("A confirmed kickoff puts its Competition on the Live rate from 5 minutes before until 30 minutes after, then back on the Idle rate")
+    func confirmedKickoffWindow() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        clock.now = todayKickoff.addingTimeInterval(-10 * 60)
+        await store.loadInitial()
+
+        clock.now = todayKickoff.addingTimeInterval(-5 * 60 - 1)
+        #expect(await tickRequests(store) == [])
+
+        clock.now = todayKickoff.addingTimeInterval(-5 * 60)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.now = todayKickoff.addingTimeInterval(30 * 60 - liveRate)
+        #expect(await tickRequests(store).joined().contains("eng.1"))
+
+        clock.now = todayKickoff.addingTimeInterval(30 * 60)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [])
+
+        clock.now = todayKickoff.addingTimeInterval(30 * 60 + idleRate)
+        #expect(await tickRequests(store).joined().contains("eng.1"))
+    }
+
+    @Test("A Match seen Live that becomes Abandoned keeps its Competition on the Live rate for 60 minutes, then the Idle rate")
+    func abandonedMatchWindow() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        await store.loadInitial()
+        let lastSeenLive = clock.now
+
+        provider.succeed(premierLeague, with: [arsenalChelseaAbandoned])
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.now = lastSeenLive.addingTimeInterval(60 * 60 - 1 - liveRate)
+        await store.tick()
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [])
+    }
+
+    @Test("An unconfirmed (\"TBD\") kickoff never puts its Competition on the Live rate")
+    func unconfirmedKickoffStaysIdle() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaTBD])
+        clock.now = todayKickoff.addingTimeInterval(-idleRate + 60)
+        await store.loadInitial()
+
+        for minutes in [-5.0, 0, 1] {
+            clock.now = todayKickoff.addingTimeInterval(minutes * 60 - 1)
+            #expect(await tickRequests(store) == [])
+        }
+
+        clock.now = todayKickoff.addingTimeInterval(60)
+        #expect(await tickRequests(store) == [["eng.1", "uefa.champions"]])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -598,4 +660,16 @@ private var parisBayernLive: Match {
     makeMatch(id: "2", competitionSlug: "uefa.champions", state: .inProgress,
               statusDetail: "12'", score: Score(home: 1, away: 0),
               kickoff: todayKickoff, home: paris, away: bayern)
+}
+/// Arsenal v Chelsea today at a nominal kickoff the Primary Source hasn't
+/// confirmed.
+private var arsenalChelseaTBD: Match {
+    makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
+              statusDetail: "TBD", kickoff: todayKickoff, isKickoffConfirmed: false)
+}
+/// Arsenal v Chelsea stopped after it was Live, as the Primary Source's
+/// "suspended".
+private var arsenalChelseaAbandoned: Match {
+    makeMatch(id: "1", competitionSlug: "eng.1", state: .abandoned,
+              statusDetail: "Susp", score: Score(home: 1, away: 0), kickoff: todayKickoff)
 }

@@ -101,6 +101,10 @@ final class MatchStore: ObservableObject {
     /// When each Competition was last requested, per feed and day. Only the
     /// browsed day and the pinned day are kept.
     private var lastRefreshes: [RefreshKey: Date] = [:]
+    /// When a fetch last showed each Match Live, by Match id, for as long as
+    /// it can still keep an Abandoned Match's Competition on the Live rate.
+    /// In memory only.
+    private var lastSeenLiveByMatchID: [String: Date] = [:]
 
     /// Distinguishes a snapshot write that reflects live observation (a poll
     /// tick, which may notify) from one that merely seeds the pinned match (pin,
@@ -377,6 +381,7 @@ final class MatchStore: ObservableObject {
         let requested = requested ?? followedCompetitions
         let requestedAt = now()
         let results = await provider.matches(for: requested, on: target)
+        noteLiveMatches(in: results, at: requestedAt)
         guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
         recordRefresh(of: requested, feed: .browse, day: target, at: requestedAt)
         applyBrowseResults(results, requested: requested, for: target)
@@ -476,10 +481,35 @@ final class MatchStore: ObservableObject {
         return lastMatchesBySlug[slug] ?? []
     }
 
+    /// How long before a confirmed kickoff its Competition goes on the Live rate.
+    private static let kickoffWindowBefore: TimeInterval = 5 * 60
+    /// How long after a confirmed kickoff its Competition stays on the Live
+    /// rate while the Match isn't Live yet.
+    private static let kickoffWindowAfter: TimeInterval = 30 * 60
+    /// How long after an Abandoned Match was last seen Live its Competition
+    /// stays on the Live rate, so a restart is noticed promptly.
+    private static let abandonedWindow: TimeInterval = 60 * 60
+
     /// True when a Competition with these Matches uses the Live rate: one of
-    /// them is Live.
+    /// them is Live, is Upcoming within its confirmed kickoff's window, or is
+    /// Abandoned less than an hour after it was last seen Live.
     private func wantsLiveRate(_ matches: [Match]) -> Bool {
-        matches.contains(where: \.isLive)
+        let now = now()
+        return matches.contains { match in
+            switch match.state {
+            case .inProgress:
+                return true
+            case .upcoming:
+                return match.isKickoffConfirmed
+                    && match.kickoff.addingTimeInterval(-Self.kickoffWindowBefore) <= now
+                    && now <= match.kickoff.addingTimeInterval(Self.kickoffWindowAfter)
+            case .abandoned:
+                guard let seen = lastSeenLiveByMatchID[match.id] else { return false }
+                return now.timeIntervalSince(seen) < Self.abandonedWindow
+            case .finished, .postponed, .cancelled:
+                return false
+            }
+        }
     }
 
     /// When the Competition under `key` is next due: its rate's interval after
@@ -489,6 +519,19 @@ final class MatchStore: ObservableObject {
         let refreshSetting = settings.cadence
         let interval = liveRate ? refreshSetting.liveInterval : refreshSetting.idleInterval
         return last.addingTimeInterval(TimeInterval(interval) / 1_000_000_000)
+    }
+
+    /// Remember which fetched Matches are Live at `time`, forgetting those
+    /// seen Live too long ago to matter.
+    private func noteLiveMatches(in results: CompetitionResults, at time: Date) {
+        lastSeenLiveByMatchID = lastSeenLiveByMatchID.filter {
+            time.timeIntervalSince($0.value) < Self.abandonedWindow
+        }
+        for case .success(let fetched) in results.values {
+            for match in fetched where match.isLive {
+                lastSeenLiveByMatchID[match.id] = time
+            }
+        }
     }
 
     /// Remember that `competitions` were requested for `feed` on `day` at
@@ -524,6 +567,7 @@ final class MatchStore: ObservableObject {
         let day = pinnedDay
         let requestedAt = now()
         let results = await provider.matches(for: competitions, on: day)
+        noteLiveMatches(in: results, at: requestedAt)
         recordRefresh(of: competitions, feed: .ticker, day: day, at: requestedAt)
         updateSnapshot(from: results, id: id, source: source)
     }
