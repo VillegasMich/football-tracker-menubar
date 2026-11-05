@@ -384,10 +384,30 @@ final class MatchStoreTests {
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
 
-        await store.loadInitial()
+        await store.tick()
 
         #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
         #expect(store.pinnedMatchID == yesterdayArsenalChelsea.id)
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+    }
+
+    @Test("After a relaunch, the restore requests a past-day Pinned Match's unfollowed Competition once, so the snapshot shows its last state, while ticks don't")
+    func relaunchRestoresPastDayPinOfUnfollowedCompetition() async {
+        let first = makeStore()
+        first.pin(yesterdayArsenalChelsea)
+        first.settings.unfollow(premierLeague)
+        await first.followedCompetitionsRefresh?.value
+
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+
+        await store.tick()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
     }
 
@@ -423,7 +443,7 @@ final class MatchStoreTests {
 
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
-        await makeStore().loadInitial()
+        await makeStore().tick()
 
         #expect(provider.requestedSlugs.suffix(3) == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
     }

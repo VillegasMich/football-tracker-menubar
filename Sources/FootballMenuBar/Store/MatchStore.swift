@@ -194,19 +194,25 @@ final class MatchStore: ObservableObject {
         pinnedMatchDay ?? Calendar.current.startOfDay(for: Date())
     }
 
-    /// The Pinned Match's Competition while it isn't followed and its day isn't
-    /// over: the ticker fetches it on top of the Followed Competitions. Its
-    /// Matches never reach the list.
-    private var unfollowedPinnedCompetition: Competition? {
+    /// The Pinned Match's Competition while it isn't followed, whatever its
+    /// day. Its Matches never reach the list.
+    private var pinnedCompetitionIfUnfollowed: Competition? {
         guard pinnedMatchID != nil, let slug = pinnedMatchCompetitionSlug,
-              !followedCompetitions.contains(where: { $0.slug == slug }),
-              pinnedDay >= Calendar.current.startOfDay(for: Date())
+              !followedCompetitions.contains(where: { $0.slug == slug })
         else { return nil }
         return Competition.inCatalogue(slugs: [slug]).first
     }
 
+    /// The Pinned Match's unfollowed Competition while its day isn't over: the
+    /// ticker keeps fetching it on top of the Followed Competitions.
+    private var unfollowedPinnedCompetition: Competition? {
+        guard pinnedDay >= Calendar.current.startOfDay(for: Date()) else { return nil }
+        return pinnedCompetitionIfUnfollowed
+    }
+
     /// The Competitions the ticker fetch requests: the Followed Competitions,
-    /// plus the Pinned Match's own while it isn't followed.
+    /// plus the Pinned Match's own while it isn't followed and its day isn't
+    /// over.
     private var tickerCompetitions: [Competition] {
         followedCompetitions + (unfollowedPinnedCompetition.map { [$0] } ?? [])
     }
@@ -402,9 +408,14 @@ final class MatchStore: ObservableObject {
 
     /// Restore the pinned ticker on launch by fetching the pinned match's day.
     /// This is a seed, not live observation, so it must never notify.
+    ///
+    /// The Pinned Match's unfollowed Competition is requested even when its day
+    /// is over, once, so the menu bar shows its last-known state again; ticks
+    /// stop requesting it after that day.
     private func restorePinnedSnapshot() async {
         guard pinnedMatchID != nil else { return }
-        await refreshTicker(requesting: tickerCompetitions, source: .seed)
+        let competitions = followedCompetitions + (pinnedCompetitionIfUnfollowed.map { [$0] } ?? [])
+        await refreshTicker(requesting: competitions, source: .seed)
     }
 
     /// Fetch `competitions` on the Pinned Match's day and update its snapshot
