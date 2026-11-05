@@ -67,6 +67,10 @@ final class MatchStore: ObservableObject {
     /// while it isn't followed. `nil` for a pin saved before the Competition
     /// was stored: such a pin is looked up among the Followed Competitions.
     private var pinnedMatchCompetitionSlug: String?
+    /// The Pinned Match's Competition's Matches on the pinned day, from the
+    /// last successful fetch of it for either feed: with the snapshot, they
+    /// decide the ticker's rate.
+    private var pinnedCompetitionMatches: [Match] = []
 
     /// The Followed Competitions, in catalogue order: what is requested and
     /// listed.
@@ -173,6 +177,7 @@ final class MatchStore: ObservableObject {
         pinnedMatchID = match.id
         pinnedMatchDay = Calendar.current.startOfDay(for: match.kickoff)
         pinnedMatchCompetitionSlug = match.competitionSlug
+        pinnedCompetitionMatches = []
         setPinnedSnapshot(match, source: .seed)
         persistPin()
     }
@@ -182,6 +187,7 @@ final class MatchStore: ObservableObject {
         pinnedMatchID = nil
         pinnedMatchDay = nil
         pinnedMatchCompetitionSlug = nil
+        pinnedCompetitionMatches = []
         setPinnedSnapshot(nil, source: .seed)
         persistPin()
     }
@@ -450,7 +456,7 @@ final class MatchStore: ObservableObject {
     /// Match's Competition's Matches give.
     private var tickerSchedule: [ScheduledRefresh] {
         let day = pinnedDay
-        let liveRate = wantsLiveRate(pinnedSnapshot.map { [$0] } ?? [])
+        let liveRate = wantsLiveRate(pinnedCompetitionMatches + (pinnedSnapshot.map { [$0] } ?? []))
         return tickerCompetitions.map { competition in
             (competition, dueAt(RefreshKey(feed: .ticker, slug: competition.slug, day: day),
                                 liveRate: liveRate))
@@ -589,6 +595,12 @@ final class MatchStore: ObservableObject {
     /// once found, a pin saved without its Competition or day saves them from
     /// then on, so the extra fetch of an unfollowed Competition can end.
     private func updateSnapshot(from results: CompetitionResults, id: String, source: SnapshotSource) {
+        defer {
+            if let slug = pinnedMatchCompetitionSlug ?? pinnedSnapshot?.competitionSlug,
+               case .success(let fetched)? = results[slug] {
+                pinnedCompetitionMatches = fetched
+            }
+        }
         if let snapshot = pinnedSnapshot {
             guard case .success(let fetched)? = results[snapshot.competitionSlug] else { return }
             setPinnedSnapshot(fetched.first { $0.id == id }, source: source)

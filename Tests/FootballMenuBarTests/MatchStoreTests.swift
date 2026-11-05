@@ -563,6 +563,63 @@ final class MatchStoreTests {
         #expect(await tickRequests(store) == [])
     }
 
+    @Test("A stale Competition whose last-known Match is Live retries at the Live rate; one that failed to load at the Idle rate")
+    func failedCompetitionsRates() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.fail(championsLeague)
+        await store.loadInitial()
+
+        provider.fail(premierLeague)
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+        #expect(store.matchesByCompetition.map(\.status) == [.stale, .failedToLoad])
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.advance(by: idleRate - 2 * liveRate)
+        #expect(await tickRequests(store) == [["eng.1", "uefa.champions"]])
+    }
+
+    @Test("An Upcoming Pinned Match today no longer puts anything on the Live rate before its kickoff window")
+    func upcomingPinnedMatchTodayStaysIdle() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        store.pin(arsenalChelsea)
+        await store.loadInitial()
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [])
+
+        clock.now = todayKickoff.addingTimeInterval(-5 * 60)
+        #expect(await tickRequests(store).joined().contains("eng.1"))
+    }
+
+    @Test("The ticker requests only the Pinned Match's Competition, not every Followed Competition")
+    func tickerRequestsOnlyPinnedCompetition() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
+        store.pin(yesterdayArsenalChelsea)
+        await store.loadInitial()
+
+        clock.advance(by: idleRate)
+
+        #expect(await tickRequests(store) == [["eng.1"], ["eng.1", "uefa.champions"]])
+    }
+
+    @Test("The ticker uses the Live rate while another Match of the Pinned Match's Competition that day is Live")
+    func tickerRateFromItsCompetitionsMatches() async {
+        let store = makeStore()
+        store.pin(barcelonaRealMadrid)
+        provider.succeed(laLiga, with: [barcelonaRealMadrid, atleticoSevillaLive])
+        await store.loadInitial()
+
+        clock.advance(by: liveRate)
+
+        #expect(await tickRequests(store) == [["esp.1"]])
+    }
+
     @Test("An unconfirmed (\"TBD\") kickoff never puts its Competition on the Live rate")
     func unconfirmedKickoffStaysIdle() async {
         let store = makeStore()
@@ -672,4 +729,12 @@ private var arsenalChelseaTBD: Match {
 private var arsenalChelseaAbandoned: Match {
     makeMatch(id: "1", competitionSlug: "eng.1", state: .abandoned,
               statusDetail: "Susp", score: Score(home: 1, away: 0), kickoff: todayKickoff)
+}
+/// Another LaLiga Match today, Live.
+private var atleticoSevillaLive: Match {
+    makeMatch(id: "6", competitionSlug: "esp.1", state: .inProgress,
+              statusDetail: "60'", score: Score(home: 0, away: 0),
+              kickoff: todayKickoff.addingTimeInterval(-6 * 3600),
+              home: Team(id: "1068", name: "Atlético Madrid", abbreviation: "ATM", logoURL: nil),
+              away: Team(id: "243", name: "Sevilla", abbreviation: "SEV", logoURL: nil))
 }
