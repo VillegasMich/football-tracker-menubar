@@ -51,6 +51,7 @@ responses from the Primary Source are saved real JSON files under
 | `Tests/FootballMenuBarTests/` | Swift Testing suite and saved Primary Source responses |
 | `Sources/FootballMenuBar/FootballMenuBarApp.swift` | `@main` entry + `AppDelegate` (hides Dock icon; tells the store when the popover opens or closes, the Mac wakes and the network comes back) |
 | `Sources/FootballMenuBar/Store/MatchStore.swift` | Match store and its refresh loop: each Competition at its own rate, only what's visible or pinned; `refreshNow()` after waking or reconnecting |
+| `Sources/FootballMenuBar/Services/NetworkRecoveryMonitor.swift` | Notices the network coming back after being unavailable (not the first path at launch) |
 | `Sources/FootballMenuBar/MenuContent.swift` | Menu bar dropdown contents |
 
 Suggested structure as the app grows (not yet created):

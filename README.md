@@ -143,6 +143,7 @@ across relaunches.
 | `Sources/FootballMenuBar/Settings/AppSettings.swift` | Persisted, observable user configuration |
 | `Sources/FootballMenuBar/Store/MatchStore.swift` | Match data store and the refresh loop: each Competition at its own rate, only what's visible or pinned |
 | `Sources/FootballMenuBar/Services/ESPNProvider.swift` | Fetches live match data from ESPN's scoreboard API |
+| `Sources/FootballMenuBar/Services/NetworkRecoveryMonitor.swift` | Notices the network coming back, so the app refreshes straight away |
 | `Sources/FootballMenuBar/Models/Competition.swift` | The catalogue of 37 Competitions, grouped by region, and the default Followed Competitions |
 
 ## Data Source

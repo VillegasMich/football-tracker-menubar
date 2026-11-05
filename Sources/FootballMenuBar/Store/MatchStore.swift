@@ -99,9 +99,10 @@ final class MatchStore: ObservableObject {
     /// The refresh started by the latest opening of the popover; awaitable so
     /// tests can wait for it.
     private(set) var popoverOpenedRefresh: Task<Void, Never>?
-    /// Set when the Followed Competitions change, or the popover opens, during
-    /// a refresh, so that refresh runs once more in full instead of the change
-    /// or the open being dropped.
+    /// Set when the Followed Competitions change, the popover opens, or a
+    /// refresh now is asked for, during a refresh, so that refresh runs once
+    /// more in full instead of the change, the open or the refresh now being
+    /// dropped.
     private var refreshPending = false
 
     /// Which feed a refresh served: the browse feed or the ticker feed.
@@ -387,7 +388,7 @@ final class MatchStore: ObservableObject {
     ///   Competition.
     func tick() async {
         let now = now()
-        await refresh(browse: browseSchedule.filter { $0.dueAt <= now }.map(\.competition),
+        await refreshFeeds(browse: browseSchedule.filter { $0.dueAt <= now }.map(\.competition),
                       ticker: tickerSchedule.filter { $0.dueAt <= now }.map(\.competition))
     }
 
@@ -404,14 +405,14 @@ final class MatchStore: ObservableObject {
     /// reconnection: it runs once more in full instead.
     func refreshNow() async {
         if isPopoverOpen, isRefreshing { refreshPending = true }
-        await refresh(browse: isPopoverOpen ? followedCompetitions : [],
+        await refreshFeeds(browse: isPopoverOpen ? followedCompetitions : [],
                       ticker: tickerCompetitions)
     }
 
     /// Fetch the `ticker` Competitions for the ticker, then the `browse`
     /// ones for the list, one request per feed. The ticker skips a
     /// Competition the browse fetch of the pinned day covers.
-    private func refresh(browse: [Competition], ticker: [Competition]) async {
+    private func refreshFeeds(browse: [Competition], ticker: [Competition]) async {
         let coveredByBrowse = pinnedDayIsBrowsed ? Set(browse.map(\.slug)) : []
         let tickerDue = ticker.filter { !coveredByBrowse.contains($0.slug) }
         if !tickerDue.isEmpty {

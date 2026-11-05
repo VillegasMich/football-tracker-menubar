@@ -16,7 +16,8 @@ final class NetworkRecoveryMonitor {
     }
 
     /// Begin watching. Path updates are delivered on the main queue, in
-    /// order, so they are handled on the main actor as they arrive.
+    /// order, so they are handled on the main actor as they arrive: the
+    /// `assumeIsolated` below relies on that queue staying `.main`.
     func start() {
         monitor.pathUpdateHandler = { [weak self] path in
             let isSatisfied = path.status == .satisfied
