@@ -326,6 +326,144 @@ final class MatchStoreTests {
         #expect(store.matches == [parisBayern])
     }
 
+    // MARK: - Pinned Match outside the Followed Competitions
+
+    @Test("An unfollowed Pinned Match's Competition is still requested for the ticker, while its Matches stay out of the list")
+    func unfollowedPinnedCompetitionStillRequested() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedMatchID == arsenalChelsea.id)
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+        #expect(store.matches == [parisBayern])
+        #expect(store.matchesByCompetition.map(\.competition) == [championsLeague])
+    }
+
+    @Test("The Pinned Match's Competition is saved with the pin, so a new store still requests it while it isn't followed")
+    func pinnedCompetitionPersists() async {
+        let first = makeStore()
+        first.pin(arsenalChelsea)
+        first.settings.unfollow(premierLeague)
+        await first.followedCompetitionsRefresh?.value
+
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+        #expect(store.matches == [parisBayern])
+    }
+
+    @Test("After unpinning, the unfollowed Competition is no longer requested")
+    func unpinStopsRequestingUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        store.unpin()
+        await store.loadInitial()
+        await makeStore().loadInitial()
+
+        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+    }
+
+    @Test("Once the Pinned Match's day is over, its unfollowed Competition is no longer requested, and the snapshot keeps its last value")
+    func pastDayStopsRequestingUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(yesterdayArsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        await store.tick()
+
+        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+        #expect(store.pinnedMatchID == yesterdayArsenalChelsea.id)
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+    }
+
+    @Test("After a relaunch, the restore requests a past-day Pinned Match's unfollowed Competition once, so the snapshot shows its last state, while ticks don't")
+    func relaunchRestoresPastDayPinOfUnfollowedCompetition() async {
+        let first = makeStore()
+        first.pin(yesterdayArsenalChelsea)
+        first.settings.unfollow(premierLeague)
+        await first.followedCompetitionsRefresh?.value
+
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+
+        await store.tick()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+    }
+
+    @Test("A pin saved without its Competition is restored from the Followed Competitions, and its Competition is saved once found")
+    func pinWithoutCompetitionRestoredFromFollowed() async {
+        defaults.set(arsenalChelsea.id, forKey: pinnedMatchIDKey)
+        defaults.set(dayKey(todayKickoff), forKey: pinnedMatchDayKey)
+        provider.succeed(premierLeague, with: [arsenalChelsea])
+        let store = makeStore()
+
+        await store.loadInitial()
+
+        #expect(provider.requestedSlugs.first == ["eng.1", "uefa.champions"])
+        #expect(store.pinnedSnapshot == arsenalChelsea)
+
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        let relaunched = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        await relaunched.loadInitial()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
+        #expect(relaunched.pinnedSnapshot == arsenalChelseaLive)
+    }
+
+    @Test("A pin saved without its day saves the Match's day once found, so its unfollowed Competition stops being requested after that day")
+    func pinWithoutDayStopsRequestingAfterItsDay() async {
+        defaults.set(yesterdayArsenalChelsea.id, forKey: pinnedMatchIDKey)
+        provider.succeed(premierLeague, with: [yesterdayArsenalChelsea])
+        let store = makeStore()
+        await store.loadInitial()
+        #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
+
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+        await makeStore().tick()
+
+        #expect(provider.requestedSlugs.suffix(3) == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+    }
+
+    @Test("A refresh tick while browsing the pinned day still fetches the unfollowed Pinned Match's Competition, alone, for the ticker")
+    func tickOnPinnedDayFetchesUnfollowedCompetition() async {
+        let store = makeStore()
+        store.pin(arsenalChelsea)
+        store.settings.unfollow(premierLeague)
+        await store.followedCompetitionsRefresh?.value
+
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.tick()
+
+        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
+        #expect(store.pinnedSnapshot == arsenalChelseaLive)
+        #expect(store.matchesByCompetition.map(\.competition) == [championsLeague])
+    }
+
     // MARK: - Browsed day
 
     @Test("A new day starts with no last Matches: a failure there is failed to load, not stale")
@@ -347,11 +485,23 @@ final class MatchStoreTests {
 
 /// Where the settings store the Followed Competitions' slugs.
 private let followedCompetitionsKey = "settings.followedCompetitions"
+/// Where a pin saved before its Competition was stored keeps its id and day
+/// (older pins have no day).
+private let pinnedMatchIDKey = "pinnedMatchID"
+private let pinnedMatchDayKey = "pinnedMatchDay"
 
 private let premierLeague = Competition(slug: "eng.1", displayName: "Premier League", region: .england)
 private let championsLeague = Competition(slug: "uefa.champions", displayName: "Champions League", region: .uefa)
 private let laLiga = Competition(slug: "esp.1", displayName: "LaLiga", region: .spain)
 private let worldCup = Competition(slug: "fifa.world", displayName: "World Cup", region: .fifa)
+
+/// A day as the store saves a pin's day: `yyyy-MM-dd`, local.
+private func dayKey(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: date)
+}
 
 /// Today's kickoff, so a Pinned Match's day is the browsed day. Computed on
 /// each use, so it is today for whichever test reads it.
@@ -362,6 +512,10 @@ private var todayKickoff: Date {
 private var arsenalChelsea: Match {
     makeMatch(id: "1", competitionSlug: "eng.1", state: .upcoming,
               statusDetail: "8:00 PM", kickoff: todayKickoff)
+}
+private var arsenalChelseaLive: Match {
+    makeMatch(id: "1", competitionSlug: "eng.1", state: .inProgress,
+              statusDetail: "30'", score: Score(home: 1, away: 0), kickoff: todayKickoff)
 }
 private var yesterdayArsenalChelsea: Match {
     makeMatch(id: "3", competitionSlug: "eng.1", state: .finished,
