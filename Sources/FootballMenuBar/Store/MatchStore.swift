@@ -2,8 +2,9 @@ import Foundation
 import Combine
 
 /// Observable store that keeps matches current for the Followed Competitions and
-/// auto-refreshes on a cadence driven by live play. Injected into the SwiftUI
-/// environment for views to read.
+/// auto-refreshes each Competition at its own rate: the Live rate while
+/// something in it is changing or about to, the Idle rate otherwise. Injected
+/// into the SwiftUI environment for views to read.
 ///
 /// It maintains two logically separate feeds:
 /// - the **browse feed** (`matches`) for `selectedDate`, powering the popover.
@@ -78,10 +79,10 @@ final class MatchStore: ObservableObject {
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
     /// The current time, for every time rule: today, the browsed and pinned
-    /// days, due kickoffs and the Pinned Match's day being over. The real
-    /// clock outside tests.
+    /// days, each Competition's rate and when it is due, and the Pinned
+    /// Match's day being over. The real clock outside tests.
     private let now: @MainActor () -> Date
-    /// User configuration; the poll loop reads the cadence from it each tick.
+    /// User configuration; each refresh step reads the Refresh setting from it.
     let settings: AppSettings
     /// Posts pinned-match notifications. Optional so tests/previews can omit it.
     private let notifier: MatchNotifier?
@@ -229,7 +230,7 @@ final class MatchStore: ObservableObject {
     }
 
     /// The Pinned Match's unfollowed Competition while its day isn't over: the
-    /// ticker keeps fetching it on top of the Followed Competitions.
+    /// ticker keeps fetching it although the list doesn't.
     private var unfollowedPinnedCompetition: Competition? {
         guard pinnedDay >= today else { return nil }
         return pinnedCompetitionIfUnfollowed
@@ -305,7 +306,7 @@ final class MatchStore: ObservableObject {
     // MARK: - Refresh loop
 
     /// Begin the auto-refresh loop: seed the ticker, load the browse feed, then
-    /// tick on an interval that depends on whether anything relevant is live.
+    /// run a refresh step whenever the next Competition is due.
     func start() {
         guard pollingTask == nil else { return }
         pollingTask = Task { [weak self] in
@@ -322,15 +323,14 @@ final class MatchStore: ObservableObject {
         }
     }
 
-    /// One refresh tick of the polling loop (internal, not private, so tests
-    /// can drive it): keep the pinned ticker live regardless of the browsed
-    /// day, and refresh the browse feed while the browsed day is today or has a
-    /// live match. Refreshing today (not just a live day) is what lets a
-    /// scheduled match flip to live on its own — a day of purely upcoming
-    /// matches would otherwise never re-fetch and so never observe kickoff. When
-    /// the browsed day is the pinned day, the browse fetch also updates the
-    /// snapshot from the Followed Competitions, so the ticker fetch requests
-    /// only the Pinned Match's unfollowed Competition, if any.
+    /// One refresh step of the polling loop (internal, not private, so tests
+    /// can drive it). It fetches only the Competitions that are due at their
+    /// rate, one request per feed:
+    /// - the browse feed's, while the browsed day is today or has a Live
+    ///   Match, so a day of Upcoming Matches still sees them kick off;
+    /// - the ticker's, regardless of the browsed day, unless this step's
+    ///   browse fetch of the pinned day already covers the Pinned Match's
+    ///   Competition.
     func tick() async {
         let now = now()
         let browseDue = browseSchedule.filter { $0.dueAt <= now }.map(\.competition)
