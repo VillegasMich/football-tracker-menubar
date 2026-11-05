@@ -51,7 +51,7 @@ final class MatchStore: ObservableObject {
     @Published private(set) var isSteppingDate = false
     @Published private(set) var hasLoadedOnce = false
     /// The day currently being browsed; defaults to today, not persisted.
-    @Published private(set) var selectedDate: Date = Calendar.current.startOfDay(for: Date())
+    @Published private(set) var selectedDate: Date
 
     // MARK: - Ticker feed
     /// Id of the single pinned match, or nil. Persisted so the pin survives
@@ -73,6 +73,10 @@ final class MatchStore: ObservableObject {
     @Published private(set) var followedCompetitions: [Competition]
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
+    /// The current time, for every time rule: today, the browsed and pinned
+    /// days, due kickoffs and the Pinned Match's day being over. The real
+    /// clock outside tests.
+    private let now: @MainActor () -> Date
     /// User configuration; the poll loop reads the cadence from it each tick.
     let settings: AppSettings
     /// Posts pinned-match notifications. Optional so tests/previews can omit it.
@@ -94,8 +98,11 @@ final class MatchStore: ObservableObject {
     init(provider: MatchDataProvider,
          defaults: UserDefaults = .standard,
          settings: AppSettings = AppSettings(),
-         notifier: MatchNotifier? = nil) {
+         notifier: MatchNotifier? = nil,
+         now: @escaping @MainActor () -> Date = { Date() }) {
         self.provider = provider
+        self.now = now
+        self.selectedDate = Calendar.current.startOfDay(for: now())
         self.followedCompetitions = settings.followedCompetitions
         self.defaults = defaults
         self.settings = settings
@@ -136,8 +143,11 @@ final class MatchStore: ObservableObject {
     /// reasons to poll on the fast cadence, and it refreshes the browse feed.
     var hasLiveMatch: Bool { matches.contains(where: \.isLive) }
 
+    /// The start of the current local day.
+    private var today: Date { Calendar.current.startOfDay(for: now()) }
+
     /// True when the selected day is the current local day.
-    var isViewingToday: Bool { Calendar.current.isDate(selectedDate, inSameDayAs: Date()) }
+    var isViewingToday: Bool { Calendar.current.isDate(selectedDate, inSameDayAs: now()) }
 
     // MARK: - Pinning
 
@@ -185,13 +195,13 @@ final class MatchStore: ObservableObject {
     /// poll on the fast cadence so the menu bar title flips to live at kickoff.
     var pinnedUpcomingKicksOffToday: Bool {
         guard let match = pinnedSnapshot, match.state == .upcoming else { return false }
-        return Calendar.current.isDateInToday(match.kickoff)
+        return Calendar.current.isDate(match.kickoff, inSameDayAs: now())
     }
 
     /// The day whose fetch feeds the ticker: the pinned match's day, or today
     /// for a legacy pin without a persisted day.
     private var pinnedDay: Date {
-        pinnedMatchDay ?? Calendar.current.startOfDay(for: Date())
+        pinnedMatchDay ?? today
     }
 
     /// The Pinned Match's Competition while it isn't followed, whatever its
@@ -206,7 +216,7 @@ final class MatchStore: ObservableObject {
     /// The Pinned Match's unfollowed Competition while its day isn't over: the
     /// ticker keeps fetching it on top of the Followed Competitions.
     private var unfollowedPinnedCompetition: Competition? {
-        guard pinnedDay >= Calendar.current.startOfDay(for: Date()) else { return nil }
+        guard pinnedDay >= today else { return nil }
         return pinnedCompetitionIfUnfollowed
     }
 
@@ -258,7 +268,7 @@ final class MatchStore: ObservableObject {
 
     /// Return the selected day to today and load it.
     func goToToday() async {
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = self.today
         guard !Calendar.current.isDate(selectedDate, inSameDayAs: today) else { return }
         selectedDate = today
         await stepLoad(today)
@@ -305,7 +315,7 @@ final class MatchStore: ObservableObject {
     /// fast cadence around kickoff so the flip to live is caught within one fast
     /// interval, then hands off to `hasLiveMatch` once the feed reports it live.
     var todayHasDueKickoff: Bool {
-        isViewingToday && matches.contains { $0.state == .upcoming && $0.kickoff <= Date() }
+        isViewingToday && matches.contains { $0.state == .upcoming && $0.kickoff <= now() }
     }
 
     /// One refresh tick of the polling loop (internal, not private, so tests
