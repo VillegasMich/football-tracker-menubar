@@ -34,6 +34,18 @@ final class MatchStoreTests {
                           now: now)
     }
 
+    /// The Live rate and Idle rate of the default Refresh setting, in seconds.
+    private let liveRate = TimeInterval(RefreshCadence.default.liveInterval) / 1_000_000_000
+    private let idleRate = TimeInterval(RefreshCadence.default.idleInterval) / 1_000_000_000
+
+    /// Runs one refresh step of `store` and returns the requests it made, one
+    /// array of slugs per request.
+    private func tickRequests(_ store: MatchStore) async -> [[String]] {
+        let before = provider.requestedSlugs.count
+        await store.tick()
+        return Array(provider.requestedSlugs.dropFirst(before))
+    }
+
     // MARK: - Followed Competitions
 
     @Test("On first launch the Followed Competitions are the three defaults, and only they are requested")
@@ -390,9 +402,10 @@ final class MatchStoreTests {
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
 
+        clock.advance(by: idleRate)
         await store.tick()
 
-        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+        #expect(provider.requestedSlugs == [["uefa.champions"], ["uefa.champions"]])
         #expect(store.pinnedMatchID == yesterdayArsenalChelsea.id)
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
     }
@@ -405,15 +418,14 @@ final class MatchStoreTests {
         await store.followedCompetitionsRefresh?.value
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
 
-        await store.tick()
-        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
+        clock.advance(by: idleRate)
+        #expect(await tickRequests(store) == [["eng.1"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == arsenalChelseaLive)
 
         clock.now = Calendar.current.date(byAdding: .day, value: 1, to: clockStartDay)!
             .addingTimeInterval(60)
-        await store.tick()
 
-        #expect(provider.requestedSlugs.last == ["uefa.champions"])
+        #expect(await tickRequests(store) == [])
         #expect(store.pinnedSnapshot == arsenalChelseaLive)
     }
 
@@ -431,9 +443,9 @@ final class MatchStoreTests {
         #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions", "eng.1"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
 
-        await store.tick()
+        clock.advance(by: idleRate)
 
-        #expect(provider.requestedSlugs.suffix(2) == [["uefa.champions"], ["uefa.champions"]])
+        #expect(await tickRequests(store) == [["uefa.champions"]])
         #expect(store.pinnedSnapshot == yesterdayArsenalChelsea)
     }
 
@@ -469,9 +481,8 @@ final class MatchStoreTests {
 
         store.settings.unfollow(premierLeague)
         await store.followedCompetitionsRefresh?.value
-        await makeStore().tick()
 
-        #expect(provider.requestedSlugs.suffix(3) == [["uefa.champions"], ["uefa.champions"], ["uefa.champions"]])
+        #expect(await tickRequests(makeStore()) == [["uefa.champions"]])
     }
 
     @Test("A refresh tick while browsing the pinned day still fetches the unfollowed Pinned Match's Competition, alone, for the ticker")
@@ -483,11 +494,27 @@ final class MatchStoreTests {
 
         provider.succeed(premierLeague, with: [arsenalChelseaLive])
         provider.succeed(championsLeague, with: [parisBayern])
-        await store.tick()
+        clock.advance(by: idleRate)
 
-        #expect(provider.requestedSlugs.suffix(2) == [["eng.1"], ["uefa.champions"]])
+        #expect(await tickRequests(store) == [["eng.1"], ["uefa.champions"]])
         #expect(store.pinnedSnapshot == arsenalChelseaLive)
         #expect(store.matchesByCompetition.map(\.competition) == [championsLeague])
+    }
+
+    // MARK: - Each Competition's rate
+
+    @Test("A Competition with a Live Match is requested at the Live rate, the others only at the Idle rate")
+    func liveCompetitionAtLiveRate() async {
+        let store = makeStore()
+        provider.succeed(premierLeague, with: [arsenalChelseaLive])
+        provider.succeed(championsLeague, with: [parisBayern])
+        await store.loadInitial()
+
+        clock.advance(by: liveRate)
+        #expect(await tickRequests(store) == [["eng.1"]])
+
+        clock.advance(by: idleRate - liveRate)
+        #expect(await tickRequests(store) == [["eng.1", "uefa.champions"]])
     }
 
     // MARK: - Browsed day
