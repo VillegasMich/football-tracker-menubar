@@ -2,8 +2,9 @@ import Foundation
 import Combine
 
 /// Observable store that keeps matches current for the Followed Competitions and
-/// auto-refreshes on a cadence driven by live play. Injected into the SwiftUI
-/// environment for views to read.
+/// auto-refreshes each Competition at its own rate: the Live rate while
+/// something in it is changing or about to, the Idle rate otherwise. Injected
+/// into the SwiftUI environment for views to read.
 ///
 /// It maintains two logically separate feeds:
 /// - the **browse feed** (`matches`) for `selectedDate`, powering the popover.
@@ -67,6 +68,10 @@ final class MatchStore: ObservableObject {
     /// while it isn't followed. `nil` for a pin saved before the Competition
     /// was stored: such a pin is looked up among the Followed Competitions.
     private var pinnedMatchCompetitionSlug: String?
+    /// The Pinned Match's Competition's Matches on the pinned day, from the
+    /// last successful fetch of it for either feed: with the snapshot, they
+    /// decide the ticker's rate.
+    private var pinnedCompetitionMatches: [Match] = []
 
     /// The Followed Competitions, in catalogue order: what is requested and
     /// listed.
@@ -74,10 +79,10 @@ final class MatchStore: ObservableObject {
     private let provider: MatchDataProvider
     private let defaults: UserDefaults
     /// The current time, for every time rule: today, the browsed and pinned
-    /// days, due kickoffs and the Pinned Match's day being over. The real
-    /// clock outside tests.
+    /// days, each Competition's rate and when it is due, and the Pinned
+    /// Match's day being over. The real clock outside tests.
     private let now: @MainActor () -> Date
-    /// User configuration; the poll loop reads the cadence from it each tick.
+    /// User configuration; each refresh step reads the Refresh setting from it.
     let settings: AppSettings
     /// Posts pinned-match notifications. Optional so tests/previews can omit it.
     private let notifier: MatchNotifier?
@@ -89,6 +94,22 @@ final class MatchStore: ObservableObject {
     /// Set when the Followed Competitions change during a refresh, so that
     /// refresh runs once more with them instead of the change being dropped.
     private var refreshPending = false
+
+    /// Which feed a refresh served: the browse feed or the ticker feed.
+    private enum Feed: Hashable { case browse, ticker }
+    /// A Competition refreshed for one feed on one day.
+    private struct RefreshKey: Hashable {
+        let feed: Feed
+        let slug: String
+        let day: Date
+    }
+    /// When each Competition was last requested, per feed and day. Only the
+    /// browsed day and the pinned day are kept.
+    private var lastRefreshes: [RefreshKey: Date] = [:]
+    /// When a fetch last showed each Match Live, by Match id, for as long as
+    /// it can still keep an Abandoned Match's Competition on the Live rate.
+    /// In memory only.
+    private var lastSeenLiveByMatchID: [String: Date] = [:]
 
     /// Distinguishes a snapshot write that reflects live observation (a poll
     /// tick, which may notify) from one that merely seeds the pinned match (pin,
@@ -139,8 +160,8 @@ final class MatchStore: ObservableObject {
         }
     }
 
-    /// True while at least one browsed match is being played — one of the
-    /// reasons to poll on the fast cadence, and it refreshes the browse feed.
+    /// True while at least one browsed match is being played: the browse feed
+    /// keeps refreshing then, even on a day other than today.
     var hasLiveMatch: Bool { matches.contains(where: \.isLive) }
 
     /// The start of the current local day.
@@ -157,8 +178,22 @@ final class MatchStore: ObservableObject {
         pinnedMatchID = match.id
         pinnedMatchDay = Calendar.current.startOfDay(for: match.kickoff)
         pinnedMatchCompetitionSlug = match.competitionSlug
+        pinnedCompetitionMatches = []
         setPinnedSnapshot(match, source: .seed)
         persistPin()
+        adoptBrowseRefresh(ofPinnedCompetition: match.competitionSlug)
+    }
+
+    /// When the pinned day is browsed, the list's last fetch of the Pinned
+    /// Match's Competition also serves the ticker: its Matches give the
+    /// ticker's rate, and the ticker is next due when that fetch says.
+    private func adoptBrowseRefresh(ofPinnedCompetition slug: String) {
+        guard pinnedDayIsBrowsed else { return }
+        pinnedCompetitionMatches = browseMatches(of: slug)
+        let browseKey = RefreshKey(feed: .browse, slug: slug, day: selectedDate)
+        if let last = lastRefreshes[browseKey] {
+            lastRefreshes[RefreshKey(feed: .ticker, slug: slug, day: selectedDate)] = last
+        }
     }
 
     /// Clear the pin, leaving no match pinned.
@@ -166,6 +201,7 @@ final class MatchStore: ObservableObject {
         pinnedMatchID = nil
         pinnedMatchDay = nil
         pinnedMatchCompetitionSlug = nil
+        pinnedCompetitionMatches = []
         setPinnedSnapshot(nil, source: .seed)
         persistPin()
     }
@@ -191,13 +227,6 @@ final class MatchStore: ObservableObject {
         }
     }
 
-    /// True when the pinned match is upcoming and kicks off today — a reason to
-    /// poll on the fast cadence so the menu bar title flips to live at kickoff.
-    var pinnedUpcomingKicksOffToday: Bool {
-        guard let match = pinnedSnapshot, match.state == .upcoming else { return false }
-        return Calendar.current.isDate(match.kickoff, inSameDayAs: now())
-    }
-
     /// The day whose fetch feeds the ticker: the pinned match's day, or today
     /// for a legacy pin without a persisted day.
     private var pinnedDay: Date {
@@ -214,17 +243,27 @@ final class MatchStore: ObservableObject {
     }
 
     /// The Pinned Match's unfollowed Competition while its day isn't over: the
-    /// ticker keeps fetching it on top of the Followed Competitions.
+    /// ticker keeps fetching it although the list doesn't.
     private var unfollowedPinnedCompetition: Competition? {
         guard pinnedDay >= today else { return nil }
         return pinnedCompetitionIfUnfollowed
     }
 
-    /// The Competitions the ticker fetch requests: the Followed Competitions,
-    /// plus the Pinned Match's own while it isn't followed and its day isn't
-    /// over.
+    /// The slug of the Pinned Match's Competition, once known.
+    private var pinnedCompetitionSlug: String? {
+        pinnedMatchCompetitionSlug ?? pinnedSnapshot?.competitionSlug
+    }
+
+    /// The Competitions the ticker fetch requests: the Pinned Match's own,
+    /// unless it isn't followed and its day is over. A pin whose Competition
+    /// isn't known yet is looked for among the Followed Competitions.
     private var tickerCompetitions: [Competition] {
-        followedCompetitions + (unfollowedPinnedCompetition.map { [$0] } ?? [])
+        guard pinnedMatchID != nil else { return [] }
+        guard let slug = pinnedCompetitionSlug else { return followedCompetitions }
+        if let followed = followedCompetitions.first(where: { $0.slug == slug }) {
+            return [followed]
+        }
+        return unfollowedPinnedCompetition.map { [$0] } ?? []
     }
 
     /// True when the browsed day is the pinned match's day, so a single fetch
@@ -277,67 +316,51 @@ final class MatchStore: ObservableObject {
     private func stepLoad(_ target: Date) async {
         isSteppingDate = true
         defer { isSteppingDate = false }
-        await loadBrowse(for: target)
+        await loadBrowse(for: target, requesting: followedCompetitions)
     }
 
     // MARK: - Refresh loop
 
     /// Begin the auto-refresh loop: seed the ticker, load the browse feed, then
-    /// tick on an interval that depends on whether anything relevant is live.
+    /// run a refresh step whenever the next Competition is due.
     func start() {
         guard pollingTask == nil else { return }
         pollingTask = Task { [weak self] in
             guard let self else { return }
             await self.loadInitial()
             while !Task.isCancelled {
-                // Read the configured cadence each iteration so a settings change
-                // takes effect no later than the next tick.
-                let cadence = self.settings.cadence
-                let interval = self.wantsLiveCadence ? cadence.liveInterval : cadence.idleInterval
-                try? await Task.sleep(nanoseconds: interval)
+                // Worked out afresh each step, so a change of the Refresh
+                // setting takes effect no later than the next one.
+                let delay = self.nextRefreshDelay()
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 if Task.isCancelled { break }
                 await self.tick()
             }
         }
     }
 
-    /// Fast (LIVE) cadence applies while the pinned match is in-progress, while
-    /// a pinned match is about to kick off today, while the browsed day has a
-    /// live match, or while today has a kickoff that is due but not yet live.
-    var wantsLiveCadence: Bool {
-        (pinnedSnapshot?.isLive ?? false) || pinnedUpcomingKicksOffToday
-            || hasLiveMatch || todayHasDueKickoff
-    }
-
-    /// True when the browsed day is today and holds an upcoming match whose
-    /// kickoff time has already passed but which the feed still reports as
-    /// upcoming — the "should be live now" window. This switches the loop to the
-    /// fast cadence around kickoff so the flip to live is caught within one fast
-    /// interval, then hands off to `hasLiveMatch` once the feed reports it live.
-    var todayHasDueKickoff: Bool {
-        isViewingToday && matches.contains { $0.state == .upcoming && $0.kickoff <= now() }
-    }
-
-    /// One refresh tick of the polling loop (internal, not private, so tests
-    /// can drive it): keep the pinned ticker live regardless of the browsed
-    /// day, and refresh the browse feed while the browsed day is today or has a
-    /// live match. Refreshing today (not just a live day) is what lets a
-    /// scheduled match flip to live on its own — a day of purely upcoming
-    /// matches would otherwise never re-fetch and so never observe kickoff. When
-    /// the browsed day is the pinned day, the browse fetch also updates the
-    /// snapshot from the Followed Competitions, so the ticker fetch requests
-    /// only the Pinned Match's unfollowed Competition, if any.
+    /// One refresh step of the polling loop (internal, not private, so tests
+    /// can drive it). It fetches only the Competitions that are due at their
+    /// rate, one request per feed:
+    /// - the browse feed's, while the browsed day is today or has a Live
+    ///   Match, so a day of Upcoming Matches still sees them kick off;
+    /// - the ticker's, regardless of the browsed day, unless this step's
+    ///   browse fetch of the pinned day already covers the Pinned Match's
+    ///   Competition.
     func tick() async {
-        let browseWillRefresh = isViewingToday || hasLiveMatch
-        if browseWillRefresh && pinnedDayIsBrowsed {
-            if let unfollowed = unfollowedPinnedCompetition {
-                await refreshTicker(requesting: [unfollowed], source: .poll)
-            }
-        } else {
-            await refreshTicker(requesting: tickerCompetitions, source: .poll)
+        let now = now()
+        let browseDue = browseSchedule.filter { $0.dueAt <= now }.map(\.competition)
+        let coveredByBrowse = pinnedDayIsBrowsed ? Set(browseDue.map(\.slug)) : []
+        let tickerDue = tickerSchedule
+            .filter { $0.dueAt <= now && !coveredByBrowse.contains($0.competition.slug) }
+            .map(\.competition)
+        if !tickerDue.isEmpty {
+            await refreshTicker(requesting: tickerDue, source: .poll)
         }
-        if browseWillRefresh {
-            await refresh()
+        // The Followed Competitions may change during the ticker fetch.
+        let browseStillDue = browseDue.filter(followedCompetitions.contains)
+        if !browseStillDue.isEmpty {
+            await refresh(requesting: browseStillDue)
         }
     }
 
@@ -354,24 +377,40 @@ final class MatchStore: ObservableObject {
         pollingTask = nil
     }
 
-    /// Fetch the browse feed for the selected day, immediately.
+    /// Fetch every Followed Competition for the selected day, immediately,
+    /// whatever their rates.
     func refresh() async {
+        await refresh(requesting: nil)
+    }
+
+    /// Fetch `due` for the selected day, or every Followed Competition when
+    /// `nil`. A change of the Followed Competitions during the fetch refetches
+    /// all of them.
+    private func refresh(requesting due: [Competition]?) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        var requested = due
         repeat {
             refreshPending = false
-            await loadBrowse(for: selectedDate)
+            await loadBrowse(for: selectedDate, requesting: requested ?? followedCompetitions)
+            requested = nil
         } while refreshPending
     }
 
-    /// Load the browse feed for `target`. Results are discarded if the selected
-    /// day changed while the fetch was in flight (out-of-order guard).
-    private func loadBrowse(for target: Date) async {
-        let requested = followedCompetitions
+    /// Load the browse feed of `requested` for `target`. Results are discarded
+    /// if the selected day changed while the fetch was in flight (out-of-order
+    /// guard).
+    private func loadBrowse(for target: Date, requesting requested: [Competition]) async {
+        let requestedAt = now()
         let results = await provider.matches(for: requested, on: target)
+        noteLiveMatches(in: results, at: requestedAt)
         guard Calendar.current.isDate(target, inSameDayAs: selectedDate) else { return }
+        recordRefresh(of: requested, feed: .browse, day: target, at: requestedAt)
         applyBrowseResults(results, requested: requested, for: target)
+        if pinnedMatchID != nil, pinnedDayIsBrowsed {
+            recordRefresh(of: requested, feed: .ticker, day: target, at: requestedAt)
+        }
         updateSnapshotFromBrowse(results)
         hasLoadedOnce = true
     }
@@ -414,6 +453,152 @@ final class MatchStore: ObservableObject {
         errorMessage = everyCompetitionFailed && matches.isEmpty ? Self.describe(firstFailure) : nil
     }
 
+    // MARK: - Each Competition's rate
+
+    /// A Competition the polling loop refreshes, and when it is next due.
+    private typealias ScheduledRefresh = (competition: Competition, dueAt: Date)
+
+    /// The Followed Competitions on the browsed day, while the browse feed
+    /// refreshes on its own: when the browsed day is today or has a Live Match.
+    private var browseSchedule: [ScheduledRefresh] {
+        guard isViewingToday || hasLiveMatch else { return [] }
+        return followedCompetitions.map { competition in
+            let usesLiveRate = wantsLiveRate(browseMatches(of: competition.slug))
+            return (competition, dueAt(RefreshKey(feed: .browse, slug: competition.slug, day: selectedDate),
+                                       usesLiveRate: usesLiveRate))
+        }
+    }
+
+    /// The ticker's Competitions on the pinned day, at the rate the Pinned
+    /// Match's Competition's Matches give.
+    private var tickerSchedule: [ScheduledRefresh] {
+        let day = pinnedDay
+        let usesLiveRate = wantsLiveRate(pinnedCompetitionKnownMatches)
+        return tickerCompetitions.map { competition in
+            (competition, dueAt(RefreshKey(feed: .ticker, slug: competition.slug, day: day),
+                                usesLiveRate: usesLiveRate))
+        }
+    }
+
+    /// How long the polling loop waits before its next refresh step (internal,
+    /// not private, so tests can check it): until the next Competition is due
+    /// at its rate, or a confirmed kickoff's window opens and changes a rate,
+    /// whichever comes first. At most one Idle-rate interval, so a change that
+    /// time alone brings, such as the browsed day becoming today, is still
+    /// noticed.
+    func nextRefreshDelay() -> TimeInterval {
+        let now = now()
+        let browse = browseSchedule
+        let ticker = tickerSchedule
+        let nextDue = (browse + ticker).map(\.dueAt).min() ?? .distantFuture
+
+        var rateDeciders = browse.flatMap { browseMatches(of: $0.competition.slug) }
+        if !ticker.isEmpty {
+            rateDeciders += pinnedCompetitionKnownMatches
+        }
+        let nextWindowOpens = rateDeciders
+            .compactMap(Self.kickoffWindowStart)
+            .filter { $0 > now }
+            .min() ?? .distantFuture
+
+        let next = min(nextDue, nextWindowOpens, now.addingTimeInterval(interval(usesLiveRate: false)))
+        return max(next.timeIntervalSince(now), Self.minimumRefreshDelay)
+    }
+
+    /// The shortest wait between two refresh steps, so a Competition due
+    /// straight away doesn't spin the loop.
+    private static let minimumRefreshDelay: TimeInterval = 1
+
+    /// The Pinned Match's Competition's Matches on the pinned day as far as
+    /// the ticker knows them: its last fetch of them, and the snapshot.
+    private var pinnedCompetitionKnownMatches: [Match] {
+        pinnedCompetitionMatches + (pinnedSnapshot.map { [$0] } ?? [])
+    }
+
+    /// The Competition's last-known Matches on the browsed day: none when it
+    /// failed to load.
+    private func browseMatches(of slug: String) -> [Match] {
+        guard let lastMatchesDay, Calendar.current.isDate(lastMatchesDay, inSameDayAs: selectedDate)
+        else { return [] }
+        return lastMatchesBySlug[slug] ?? []
+    }
+
+    /// How long before a confirmed kickoff its Competition goes on the Live rate.
+    private static let kickoffWindowBefore: TimeInterval = 5 * 60
+    /// How long after a confirmed kickoff its Competition stays on the Live
+    /// rate while the Match isn't Live yet.
+    private static let kickoffWindowAfter: TimeInterval = 30 * 60
+    /// How long after an Abandoned Match was last seen Live its Competition
+    /// stays on the Live rate, so a restart is noticed promptly.
+    private static let abandonedWindow: TimeInterval = 60 * 60
+
+    /// True when a Competition with these Matches uses the Live rate: one of
+    /// them is Live, is Upcoming within its confirmed kickoff's window, or is
+    /// Abandoned less than an hour after it was last seen Live.
+    private func wantsLiveRate(_ matches: [Match]) -> Bool {
+        let now = now()
+        return matches.contains { match in
+            switch match.state {
+            case .inProgress:
+                return true
+            case .upcoming:
+                guard let windowStart = Self.kickoffWindowStart(of: match) else { return false }
+                return windowStart <= now
+                    && now <= match.kickoff.addingTimeInterval(Self.kickoffWindowAfter)
+            case .abandoned:
+                guard let seen = lastSeenLiveByMatchID[match.id] else { return false }
+                return now.timeIntervalSince(seen) < Self.abandonedWindow
+            case .finished, .postponed, .cancelled:
+                return false
+            }
+        }
+    }
+
+    /// When an Upcoming Match's confirmed kickoff window opens; `nil` for any
+    /// other Match, an unconfirmed kickoff included.
+    private static func kickoffWindowStart(of match: Match) -> Date? {
+        guard match.state == .upcoming, match.isKickoffConfirmed else { return nil }
+        return match.kickoff.addingTimeInterval(-kickoffWindowBefore)
+    }
+
+    /// The current Refresh setting's Live rate or Idle rate, in seconds.
+    private func interval(usesLiveRate: Bool) -> TimeInterval {
+        let refreshSetting = settings.cadence
+        let nanoseconds = usesLiveRate ? refreshSetting.liveInterval : refreshSetting.idleInterval
+        return TimeInterval(nanoseconds) / 1_000_000_000
+    }
+
+    /// When the Competition under `key` is next due: its rate's interval after
+    /// its last refresh, or straight away if it has none.
+    private func dueAt(_ key: RefreshKey, usesLiveRate: Bool) -> Date {
+        guard let last = lastRefreshes[key] else { return .distantPast }
+        return last.addingTimeInterval(interval(usesLiveRate: usesLiveRate))
+    }
+
+    /// Remember which fetched Matches are Live at `time`, forgetting those
+    /// seen Live too long ago to matter.
+    private func noteLiveMatches(in results: CompetitionResults, at time: Date) {
+        lastSeenLiveByMatchID = lastSeenLiveByMatchID.filter {
+            time.timeIntervalSince($0.value) < Self.abandonedWindow
+        }
+        for case .success(let fetched) in results.values {
+            for match in fetched where match.isLive {
+                lastSeenLiveByMatchID[match.id] = time
+            }
+        }
+    }
+
+    /// Remember that `competitions` were requested for `feed` on `day` at
+    /// `time`, forgetting days that are neither browsed nor pinned.
+    private func recordRefresh(of competitions: [Competition], feed: Feed, day: Date, at time: Date) {
+        let day = Calendar.current.startOfDay(for: day)
+        let keptDays = [selectedDate, pinnedDay].map { Calendar.current.startOfDay(for: $0) }
+        lastRefreshes = lastRefreshes.filter { keptDays.contains($0.key.day) }
+        for competition in competitions {
+            lastRefreshes[RefreshKey(feed: feed, slug: competition.slug, day: day)] = time
+        }
+    }
+
     // MARK: - Ticker feed
 
     /// Restore the pinned ticker on launch by fetching the pinned match's day.
@@ -433,7 +618,11 @@ final class MatchStore: ObservableObject {
     /// launch seed from a live poll tick for notification purposes.
     private func refreshTicker(requesting competitions: [Competition], source: SnapshotSource) async {
         guard let id = pinnedMatchID else { setPinnedSnapshot(nil, source: source); return }
-        let results = await provider.matches(for: competitions, on: pinnedDay)
+        let day = pinnedDay
+        let requestedAt = now()
+        let results = await provider.matches(for: competitions, on: day)
+        noteLiveMatches(in: results, at: requestedAt)
+        recordRefresh(of: competitions, feed: .ticker, day: day, at: requestedAt)
         updateSnapshot(from: results, id: id, source: source)
     }
 
@@ -454,6 +643,11 @@ final class MatchStore: ObservableObject {
     /// once found, a pin saved without its Competition or day saves them from
     /// then on, so the extra fetch of an unfollowed Competition can end.
     private func updateSnapshot(from results: CompetitionResults, id: String, source: SnapshotSource) {
+        defer {
+            if let slug = pinnedCompetitionSlug, case .success(let fetched)? = results[slug] {
+                pinnedCompetitionMatches = fetched
+            }
+        }
         if let snapshot = pinnedSnapshot {
             guard case .success(let fetched)? = results[snapshot.competitionSlug] else { return }
             setPinnedSnapshot(fetched.first { $0.id == id }, source: source)

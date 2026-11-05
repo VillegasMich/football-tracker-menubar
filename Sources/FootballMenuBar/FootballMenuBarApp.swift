@@ -230,7 +230,8 @@ private struct MenuBarLabel: View {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// User configuration, alive for the app's lifetime and shared with the
-    /// store (for cadence) and the views (for the live pill and overrides).
+    /// store (for the Refresh setting) and the views (for the live pill and
+    /// overrides).
     let settings = AppSettings()
 
     /// Posts pinned-match kickoff/goal notifications. Requests authorization on
