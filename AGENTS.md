@@ -8,7 +8,10 @@ matches and scores from just those Competitions.
 - Live and upcoming match results for a curated set of Competitions.
 - A settings/selection UI where the user chooses which Competitions to follow.
 - Lightweight, glanceable menu bar presence — quick to open, no Dock icon.
-- Auto-refreshing scores at a sensible interval while matches are live.
+- Auto-refreshing scores, each Competition at its own rate (the Live rate
+  while something in it is changing or about to, the Idle rate otherwise),
+  refreshing only what's visible: the list while the popover is open, the
+  Pinned Match's Competition otherwise.
 
 ## Tech stack
 - **Language:** Swift 6 (toolchain only — full Xcode is NOT installed).
@@ -46,7 +49,9 @@ responses from the Primary Source are saved real JSON files under
 | `Sources/FootballMenuBar/MatchRowPresentation.swift` | Pure presentation of a single Match row |
 | `Sources/FootballMenuBar/CompetitionFailureNote.swift` | Pure wording of the note under a Competition that failed to update |
 | `Tests/FootballMenuBarTests/` | Swift Testing suite and saved Primary Source responses |
-| `Sources/FootballMenuBar/FootballMenuBarApp.swift` | `@main` entry + `AppDelegate` (hides Dock icon) |
+| `Sources/FootballMenuBar/FootballMenuBarApp.swift` | `@main` entry + `AppDelegate` (hides Dock icon; tells the store when the popover opens or closes, the Mac wakes and the network comes back) |
+| `Sources/FootballMenuBar/Store/MatchStore.swift` | Match store and its refresh loop: each Competition at its own rate, only what's visible or pinned; `refreshNow()` after waking or reconnecting |
+| `Sources/FootballMenuBar/Services/NetworkRecoveryMonitor.swift` | Notices the network coming back after being unavailable (not the first path at launch) |
 | `Sources/FootballMenuBar/MenuContent.swift` | Menu bar dropdown contents |
 
 Suggested structure as the app grows (not yet created):
@@ -72,7 +77,12 @@ Suggested structure as the app grows (not yet created):
   `docs/adr/0001-espn-primary-source-openligadb-backup.md`.
 - ~~Define the initial set of supported leagues.~~ Decided: a curated list of 37
   Competitions, specified in the Followed Competitions spec (GitHub issue).
-- Decide the live-score refresh cadence and how to back off when idle.
+- ~~Decide the live-score refresh cadence and how to back off when idle.~~
+  Decided: each Competition refreshes at the Live rate or Idle rate of the
+  Refresh setting; only the list while the popover is open, otherwise only
+  the Pinned Match's Competition (nothing without a pin); straight away when
+  the popover opens, the Mac wakes or the network comes back. Specified in
+  the Smarter polling spec (GitHub issue #28).
 
 ## Agent skills
 
