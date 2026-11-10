@@ -22,4 +22,11 @@ if [[ "$(xcode-select -p 2>/dev/null || true)" == /Library/Developer/CommandLine
           -Xlinker -rpath -Xlinker "$CLT_FRAMEWORKS" -Xlinker -rpath -Xlinker "$CLT_LIBS")
 fi
 
+# Run the suite in debug AND release. Release matters because ./dev.sh and
+# ./build.sh ship release builds, and the optimizer can break code that passes
+# in debug: Swift 6.4.2 miscompiles typed throws in task-group children (see
+# ESPNProvider.matches(for:on:)), which only the release run catches.
+echo "==> Tests (debug)"
 swift test ${flags[@]+"${flags[@]}"} "$@"
+echo "==> Tests (release)"
+swift test -c release ${flags[@]+"${flags[@]}"} "$@"

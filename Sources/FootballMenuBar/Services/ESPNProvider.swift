@@ -37,13 +37,22 @@ struct ESPNProvider: MatchDataProvider {
     func matches(for competitions: [Competition], on day: Date) async -> CompetitionResults {
         // One scoreboard call per Competition, fetched concurrently. Each
         // Competition's failure is kept apart, so it never fails the others.
+        //
+        // Deliberately no typed throws here. Swift 6.4.2's optimizer
+        // miscompiles a task-group child that awaits an `async throws(E)`
+        // function: release builds lose the child's result or abort with
+        // "Pure virtual function called!" (debug builds are fine). `./test.sh`
+        // runs the suite in release too, so this regresses loudly.
         await withTaskGroup(of: (String, Result<[Match], MatchDataError>).self) { group in
             for competition in competitions {
                 group.addTask {
-                    do throws(MatchDataError) {
+                    do {
                         return (competition.slug, .success(try await self.matches(for: competition, on: day)))
-                    } catch {
+                    } catch let error as MatchDataError {
                         return (competition.slug, .failure(error))
+                    } catch {
+                        // Unreachable: the fetch only throws MatchDataError.
+                        return (competition.slug, .failure(.network(underlying: error)))
                     }
                 }
             }
@@ -55,7 +64,9 @@ struct ESPNProvider: MatchDataProvider {
         }
     }
 
-    private func matches(for competition: Competition, on day: Date) async throws(MatchDataError) -> [Match] {
+    /// Fetches one Competition's scoreboard. Throws only `MatchDataError`, but
+    /// is declared untyped `throws` on purpose (see `matches(for:on:)`).
+    private func matches(for competition: Competition, on day: Date) async throws -> [Match] {
         let request = URLRequest(url: scoreboardURL(slug: competition.slug, day: day))
         let data: Data
         let response: URLResponse
