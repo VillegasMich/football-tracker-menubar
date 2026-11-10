@@ -6,11 +6,12 @@ set -euo pipefail
 # differ only in the identity they pass in:
 #
 #   scripts/bundle-app.sh --output <path/to/Name.app> --bundle-id <id> \
-#       --name <CFBundleName> --display-name <CFBundleDisplayName> \
+#       --bundle-name <CFBundleName> --display-name <CFBundleDisplayName> \
 #       --version <version>
 #
-# --version sets both CFBundleShortVersionString and CFBundleVersion.
-# Any existing bundle at --output is replaced.
+# --output is relative to the repo root, and any bundle already there is
+# replaced. --version is the CFBundleShortVersionString; CFBundleVersion is
+# its numeric part (1.2.3-beta1 => 1.2.3), as macOS requires.
 
 cd "$(dirname "$0")/.."
 
@@ -18,25 +19,26 @@ EXECUTABLE="FootballMenuBar"
 
 usage() {
     echo "Usage: scripts/bundle-app.sh --output <Name.app> --bundle-id <id>" \
-        "--name <name> --display-name <name> --version <version>" >&2
+        "--bundle-name <name> --display-name <name> --version <version>" >&2
     exit 2
 }
 
-OUTPUT="" BUNDLE_ID="" NAME="" DISPLAY_NAME="" VERSION=""
+OUTPUT="" BUNDLE_ID="" BUNDLE_NAME="" DISPLAY_NAME="" VERSION=""
 while [[ $# -gt 0 ]]; do
     [[ $# -ge 2 ]] || usage
     case "$1" in
         --output) OUTPUT="$2" ;;
         --bundle-id) BUNDLE_ID="$2" ;;
-        --name) NAME="$2" ;;
+        --bundle-name) BUNDLE_NAME="$2" ;;
         --display-name) DISPLAY_NAME="$2" ;;
         --version) VERSION="$2" ;;
         *) usage ;;
     esac
     shift 2
 done
-[[ -n "${OUTPUT}" && -n "${BUNDLE_ID}" && -n "${NAME}" && -n "${DISPLAY_NAME}" && -n "${VERSION}" ]] || usage
+[[ -n "${OUTPUT}" && -n "${BUNDLE_ID}" && -n "${BUNDLE_NAME}" && -n "${DISPLAY_NAME}" && -n "${VERSION}" ]] || usage
 [[ "${OUTPUT}" == *.app ]] || { echo "Error: --output must end in .app" >&2; exit 2; }
+BUILD_VERSION="${VERSION%%[-+]*}"
 
 echo "==> Building release binary"
 swift build -c release
@@ -62,7 +64,7 @@ cat > "${OUTPUT}/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>${NAME}</string>
+    <string>${BUNDLE_NAME}</string>
     <key>CFBundleDisplayName</key>
     <string>${DISPLAY_NAME}</string>
     <key>CFBundleExecutable</key>
@@ -76,7 +78,7 @@ cat > "${OUTPUT}/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>${VERSION}</string>
+    <string>${BUILD_VERSION}</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>

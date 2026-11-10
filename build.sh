@@ -13,13 +13,14 @@ BUNDLE_ID="com.local.footballmenubar"
 # Must match the git tag / GitHub Release (tag "v1.0.0" => VERSION "1.0.0")
 # and the `version` field in the Homebrew cask. Overridable via env so CI can
 # derive it from the pushed tag, e.g. `VERSION=1.2.3 ./build.sh`. It is also
-# the app's displayed version (CFBundleShortVersionString and CFBundleVersion).
+# the app's displayed version (CFBundleShortVersionString; CFBundleVersion is
+# its numeric part).
 VERSION="${VERSION:-1.0.0}"
 
 scripts/bundle-app.sh \
     --output "${BUNDLE}" \
     --bundle-id "${BUNDLE_ID}" \
-    --name "${APP_NAME}" \
+    --bundle-name "${APP_NAME}" \
     --display-name "Football Menu Bar" \
     --version "${VERSION}"
 
