@@ -14,28 +14,56 @@ matches and scores from just those Competitions.
   Pinned Match's Competition otherwise.
 
 ## Tech stack
-- **Language:** Swift 6 (toolchain only — full Xcode is NOT installed).
+- **Language:** Swift 6.
+- **Toolchain:** full Xcode is required, selected with `xcode-select`
+  (`xcode-select -p` → `/Applications/Xcode.app/Contents/Developer`). The
+  macOS 27 SDK implements SwiftUI's `@State` as a macro whose plugin
+  (`libSwiftUIMacros`) ships only with Xcode, so with the Command Line Tools
+  selected the build fails with "plugin for module 'SwiftUIMacros' not found".
 - **UI:** SwiftUI, using the `MenuBarExtra` scene (macOS 13+).
 - **Build system:** Swift Package Manager (executable target). No `.xcodeproj`.
 - **App style:** `.accessory` activation policy → menu bar only, no Dock icon.
 
 ## Build & run
 ```sh
-swift build      # compile
-swift run        # launch (⚽ appears in the menu bar)
+swift build              # compile
+./dev.sh                 # build, install and (re)launch "FootballMenuBar Dev"
+./dev.sh --no-launch     # build and install the dev copy without launching it
+VERSION=1.2.3 ./build.sh # release build: FootballMenuBar.app + FootballMenuBar-1.2.3.zip
 ```
+Run the app with `./dev.sh`, not `swift run`: a bare binary has no app
+bundle, so `UNUserNotificationCenter.current()` asserts and the app crashes
+at launch.
+
+The dev and release builds are separate apps, so a dev copy runs alongside an
+installed FootballMenuBar without disturbing it:
+
+| | `./dev.sh` (dev) | `./build.sh` (release) |
+| --- | --- | --- |
+| Name | "FootballMenuBar Dev" | "FootballMenuBar" (displayed "Football Menu Bar") |
+| Bundle ID | `com.local.footballmenubar.dev` | `com.local.footballmenubar` |
+| Output | `~/Applications/FootballMenuBar Dev.app` | `FootballMenuBar.app` and `FootballMenuBar-${VERSION}.zip` in the repo root (both git-ignored) |
+| Version | `VERSION`, default `1.0.0` | `VERSION`, default `1.0.0`; the release workflow sets it from the tag |
+
+- Each has its own settings, since `UserDefaults` follow the bundle ID.
+- Both are signed ad-hoc with the bundle ID as identifier, which
+  notifications need.
+- `./dev.sh` always installs to the same place, so macOS keeps remembering
+  its menu bar slot. Before replacing it, it quits only a running dev copy,
+  matched by its executable path; the installed app is never quit.
 
 ## Tests
 ```sh
 ./test.sh                     # run the whole suite (Swift Testing)
 ./test.sh --filter <name>     # run matching tests; extra args go to `swift test`
 ```
-Use `./test.sh`, not plain `swift test`. With only the Command Line Tools
-installed, `swift test` fails with "no such module 'Testing'" because Swift
-Testing lives in the CLT's Developer directory, which SwiftPM doesn't search.
-The script adds that framework path (compile, link and rpath) when the active
-developer directory is the Command Line Tools, and is plain `swift test` with
-full Xcode. Tests live in `Tests/FootballMenuBarTests` and must run offline:
+Use `./test.sh`, not plain `swift test`. With Xcode selected (required, see
+Tech stack) it is plain `swift test`. It still supports the Command Line Tools
+on SDKs that build without Xcode: there, `swift test` fails with "no such
+module 'Testing'" because Swift Testing lives in the CLT's Developer
+directory, which SwiftPM doesn't search, so the script adds that framework
+path (compile, link and rpath) when the active developer directory is the
+Command Line Tools. Tests live in `Tests/FootballMenuBarTests` and must run offline:
 responses from the Primary Source are saved real JSON files under
 `Tests/FootballMenuBarTests/Fixtures/ESPN/{slug}/{YYYYMMDD}.json`, served to
 `ESPNProvider` through a stub `URLSession`.
@@ -45,6 +73,9 @@ responses from the Primary Source are saved real JSON files under
 | --- | --- |
 | `Package.swift` | SPM manifest, macOS 13+ executable target and test target |
 | `test.sh` | Runs the test suite (see Tests) |
+| `dev.sh` | Builds, installs and launches the dev copy (see Build & run) |
+| `build.sh` | Builds the release app and its zip (see Build & run) |
+| `scripts/bundle-app.sh` | Shared by `dev.sh` and `build.sh`: builds, assembles and signs an app bundle for a given identity |
 | `Sources/FootballMenuBar/MenuBarTitle.swift` | Pure builder for the Pinned Match's menu bar title |
 | `Sources/FootballMenuBar/MatchRowPresentation.swift` | Pure presentation of a single Match row |
 | `Sources/FootballMenuBar/CompetitionFailureNote.swift` | Pure wording of the note under a Competition that failed to update |
