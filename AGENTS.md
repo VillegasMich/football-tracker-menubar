@@ -54,9 +54,17 @@ installed FootballMenuBar without disturbing it:
 
 ## Tests
 ```sh
-./test.sh                     # run the whole suite (Swift Testing)
+./test.sh                     # run the whole suite (Swift Testing), in debug and release
 ./test.sh --filter <name>     # run matching tests; extra args go to `swift test`
 ```
+
+The suite runs twice, in debug and in release, because `./dev.sh` and `./build.sh`
+ship release builds and the optimizer can break code that passes in debug.
+**Don't use typed throws (`throws(SomeError)`) in async code:** Swift 6.4.2's
+optimizer miscompiles a task-group child that awaits an `async throws(E)`
+function, which crashed release builds ("Pure virtual function called!") while
+every debug test passed. See `ESPNProvider.matches(for:on:)`.
+
 Use `./test.sh`, not plain `swift test`. With Xcode selected (required, see
 Tech stack) it is plain `swift test`. It still supports the Command Line Tools
 on SDKs that build without Xcode: there, `swift test` fails with "no such
