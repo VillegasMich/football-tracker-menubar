@@ -41,7 +41,9 @@ surfaces scores, kickoff times, and live match minutes at a glance.
 ## Requirements
 
 - macOS 13 or later
-- Swift 6 toolchain (no full Xcode install required)
+- To build from source: Xcode with Swift 6, selected with `xcode-select`. On
+  macOS 27 the Command Line Tools alone can't build the app: the SDK's
+  SwiftUI needs a macro plugin that ships only with Xcode
 
 ## Getting Started
 
@@ -73,23 +75,35 @@ brew uninstall --zap --cask football-menubar   # also removes preferences
 ### Run in development
 
 ```sh
-swift run
+./dev.sh
 ```
 
+This builds **FootballMenuBar Dev**, a separate copy of the app with its own
+bundle ID (`com.local.footballmenubar.dev`) and its own settings, installs it
+at `~/Applications/FootballMenuBar Dev.app` and launches it. It runs alongside
+an installed Football Menu Bar: running `./dev.sh` again quits and relaunches
+only the dev copy, never the installed app. Use `./dev.sh --no-launch` to
+build and install it without launching it.
+
 A ⚽ icon appears in the menu bar. The app has no Dock icon (it runs as an
-`.accessory` app). Use **Quit** in the menu to stop it, or press `Ctrl-C` in
-the terminal that launched it.
+`.accessory` app). Use **Quit** in the menu to stop it.
+
+`swift run` isn't supported: without an app bundle the app crashes at launch
+when it sets up notifications.
 
 ### Build a standalone app
 
-To get an app you can launch and leave running (no terminal attached), build
-an `.app` bundle:
+To build the release app (bundle ID `com.local.footballmenubar`, the same app
+the Homebrew cask installs):
 
 ```sh
-./build.sh
+./build.sh                 # version 1.0.0
+VERSION=1.2.3 ./build.sh   # version 1.2.3
 ```
 
-This produces `FootballMenuBar.app` in the project root. Launch it with:
+This produces `FootballMenuBar.app` in the project root, with `VERSION` as
+its version, plus `FootballMenuBar-${VERSION}.zip` for a GitHub Release (the
+release workflow sets `VERSION` from the pushed tag). Launch it with:
 
 ```sh
 open FootballMenuBar.app
